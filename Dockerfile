@@ -20,15 +20,12 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 
-# Build tools for better-sqlite3 (needed at runtime install too)
-RUN apk add --no-cache python3 make g++
-
-# Install only production dependencies
+# Install build tools, install production deps, then remove tools — all in one
+# layer so intermediate files don't bloat the final image
 COPY backend/package*.json ./
-RUN npm install --only=production
-
-# Remove build tools after install to keep image smaller
-RUN apk del python3 make g++
+RUN apk add --no-cache python3 make g++ \
+  && npm install --omit=dev \
+  && apk del python3 make g++
 
 # Copy backend build output
 COPY --from=backend-build /app/backend/dist ./dist

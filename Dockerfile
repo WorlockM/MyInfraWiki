@@ -2,7 +2,7 @@
 FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -12,7 +12,7 @@ WORKDIR /app/backend
 # Build tools needed for better-sqlite3 native compilation
 RUN apk add --no-cache python3 make g++
 COPY backend/package*.json ./
-RUN npm ci
+RUN npm install
 COPY backend/ ./
 RUN npm run build
 
@@ -25,7 +25,7 @@ RUN apk add --no-cache python3 make g++
 
 # Install only production dependencies
 COPY backend/package*.json ./
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Remove build tools after install to keep image smaller
 RUN apk del python3 make g++

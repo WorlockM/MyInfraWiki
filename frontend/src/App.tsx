@@ -1,0 +1,199 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import Sidebar from './components/Sidebar';
+import Editor from './components/Editor';
+import SearchModal from './components/SearchModal';
+import { Moon, Sun, Search } from 'lucide-react';
+
+export interface PageTreeNode {
+  id: string;
+  title: string;
+  parent_id: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  children: PageTreeNode[];
+}
+
+export interface PageData {
+  id: string;
+  title: string;
+  content: string;
+  parent_id: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+function buildTree(pages: Omit<PageTreeNode, 'children'>[]): PageTreeNode[] {
+  const map = new Map<string, PageTreeNode>();
+  const roots: PageTreeNode[] = [];
+
+  for (const page of pages) {
+    map.set(page.id, { ...page, children: [] });
+  }
+
+  for (const page of pages) {
+    const node = map.get(page.id)!;
+    if (page.parent_id && map.has(page.parent_id)) {
+      map.get(page.parent_id)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  // Sort children by position
+  const sortChildren = (nodes: PageTreeNode[]) => {
+    nodes.sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
+    nodes.forEach((n) => sortChildren(n.children));
+  };
+  sortChildren(roots);
+
+  return roots;
+}
+
+export default function App() {
+  const [pages, setPages] = useState<PageTreeNode[]>([]);
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('darkMode') === 'true';
+  });
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Apply dark mode
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+    localStorage.setItem('darkMode', String(darkMode));
+  }, [darkMode]);
+
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const fetchPages = useCallback(async () => {
+    try {
+      const res = await axios.get<Omit<PageTreeNode, 'children'>[]>('/api/pages');
+      setPages(buildTree(res.data));
+    } catch (err) {
+      console.error('Failed to fetch pages:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPages();
+  }, [fetchPages]);
+
+  const handleNewPage = async (parentId: string | null = null) => {
+    try {
+      const res = await axios.post<PageData>('/api/pages', {
+        title: 'Untitled',
+        content: '',
+        parent_id: parentId,
+      });
+      await fetchPages();
+      setSelectedPageId(res.data.id);
+    } catch (err) {
+      console.error('Failed to create page:', err);
+    }
+  };
+
+  const handleDeletePage = async (id: string) => {
+    try {
+      await axios.delete(`/api/pages/${id}`);
+      if (selectedPageId === id) {
+        setSelectedPageId(null);
+      }
+      await fetchPages();
+    } catch (err) {
+      console.error('Failed to delete page:', err);
+    }
+  };
+
+  const handlePageSaved = useCallback(() => {
+    fetchPages();
+  }, [fetchPages]);
+
+  return (
+    <div className="app-container">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <span className="sidebar-logo">MyInfraWiki</span>
+          <div className="sidebar-header-actions">
+            <button
+              className="icon-btn"
+              onClick={() => setSearchOpen(true)}
+              title="Search (Cmd+K)"
+              aria-label="Open search"
+            >
+              <Search size={16} />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => setDarkMode((d) => !d)}
+              title="Toggle dark mode"
+              aria-label="Toggle dark mode"
+            >
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="sidebar-loading">Loading...</div>
+        ) : (
+          <Sidebar
+            pages={pages}
+            selectedPageId={selectedPageId}
+            onSelectPage={setSelectedPageId}
+            onNewPage={handleNewPage}
+            onDeletePage={handleDeletePage}
+          />
+        )}
+      </aside>
+
+      <main className="main-content">
+        {selectedPageId ? (
+          <Editor
+            key={selectedPageId}
+            pageId={selectedPageId}
+            onSaved={handlePageSaved}
+          />
+        ) : (
+          <div className="empty-state">
+            <div className="empty-state-inner">
+              <h2>Welcome to MyInfraWiki</h2>
+              <p>Select a page from the sidebar or create a new one to get started.</p>
+              <button className="btn-primary" onClick={() => handleNewPage(null)}>
+                Create your first page
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {searchOpen && (
+        <SearchModal
+          onClose={() => setSearchOpen(false)}
+          onSelectPage={(id) => {
+            setSelectedPageId(id);
+            setSearchOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}

@@ -221,6 +221,12 @@ html, body, #root {
   cursor: grabbing;
 }
 
+.page-row--drop-inside {
+  background: var(--color-primary-light) !important;
+  outline: 1px solid var(--color-primary);
+  border-radius: 3px;
+}
+
 .page-tree-item--dragging > .page-row {
   opacity: 0.4;
 }

@@ -125,6 +125,15 @@ export default function App() {
     }
   };
 
+  const handleReparentPage = useCallback(async (pageId: string, newParentId: string) => {
+    try {
+      await axios.put(`/api/pages/${pageId}`, { parent_id: newParentId });
+      await fetchPages();
+    } catch (err) {
+      console.error('Failed to reparent page:', err);
+    }
+  }, [fetchPages]);
+
   const handleReorderPages = useCallback(async (parentId: string | null, orderedIds: string[]) => {
     try {
       await Promise.all(
@@ -175,6 +184,7 @@ export default function App() {
             onNewPage={handleNewPage}
             onDeletePage={handleDeletePage}
             onReorderPages={handleReorderPages}
+            onReparentPage={handleReparentPage}
           />
         )}
       </aside>

@@ -17,6 +17,7 @@ interface SidebarProps {
   onNewPage: (parentId: string | null) => void;
   onDeletePage: (id: string) => void;
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
+  onReparentPage: (pageId: string, newParentId: string) => void;
 }
 
 interface PageItemProps {
@@ -27,7 +28,9 @@ interface PageItemProps {
   onNewPage: (parentId: string | null) => void;
   onDeletePage: (id: string) => void;
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
+  onReparentPage: (pageId: string, newParentId: string) => void;
   dragging: boolean;
+  dropInside: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -43,12 +46,16 @@ interface PageListProps {
   onNewPage: (parentId: string | null) => void;
   onDeletePage: (id: string) => void;
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
+  onReparentPage: (pageId: string, newParentId: string) => void;
 }
 
-function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages }: PageListProps) {
+type DropPosition = 'before' | 'after' | 'inside';
+type DropInfo = { id: string; position: DropPosition };
+
+function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage }: PageListProps) {
   const draggedIdRef = useRef<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dropInfo, setDropInfo] = useState<{ id: string; before: boolean } | null>(null);
+  const [dropInfo, setDropInfo] = useState<DropInfo | null>(null);
 
   const reset = () => {
     draggedIdRef.current = null;
@@ -77,8 +84,9 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
     e.stopPropagation();
     if (draggedIdRef.current === id) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const before = e.clientY < rect.top + rect.height / 2;
-    setDropInfo(prev => (prev?.id === id && prev.before === before ? prev : { id, before }));
+    const ratio = (e.clientY - rect.top) / rect.height;
+    const position: DropPosition = ratio < 0.25 ? 'before' : ratio > 0.75 ? 'after' : 'inside';
+    setDropInfo(prev => (prev?.id === id && prev.position === position ? prev : { id, position }));
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -87,12 +95,15 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
     const draggedId = draggedIdRef.current;
     if (!draggedId || !dropInfo || draggedId === dropInfo.id) { reset(); return; }
 
-    const newOrder = nodes.map(n => n.id).filter(id => id !== draggedId);
-    const targetIdx = newOrder.indexOf(dropInfo.id);
-    if (targetIdx === -1) { reset(); return; }
-    newOrder.splice(dropInfo.before ? targetIdx : targetIdx + 1, 0, draggedId);
-
-    onReorderPages(parentId, newOrder);
+    if (dropInfo.position === 'inside') {
+      onReparentPage(draggedId, dropInfo.id);
+    } else {
+      const newOrder = nodes.map(n => n.id).filter(id => id !== draggedId);
+      const targetIdx = newOrder.indexOf(dropInfo.id);
+      if (targetIdx === -1) { reset(); return; }
+      newOrder.splice(dropInfo.position === 'before' ? targetIdx : targetIdx + 1, 0, draggedId);
+      onReorderPages(parentId, newOrder);
+    }
     reset();
   };
 
@@ -106,7 +117,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
     <div onDragLeave={handleDragLeave}>
       {nodes.map(node => (
         <React.Fragment key={node.id}>
-          {dropInfo?.id === node.id && dropInfo.before && (
+          {dropInfo?.id === node.id && dropInfo.position === 'before' && (
             <div className="drop-indicator" style={{ marginLeft: `${8 + depth * 16}px` }} />
           )}
           <PageItem
@@ -117,13 +128,15 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
             onNewPage={onNewPage}
             onDeletePage={onDeletePage}
             onReorderPages={onReorderPages}
+            onReparentPage={onReparentPage}
             dragging={draggingId === node.id}
+            dropInside={dropInfo?.id === node.id && dropInfo.position === 'inside'}
             onDragStart={handleDragStart(node.id)}
             onDragEnd={reset}
             onDragOver={handleDragOver(node.id)}
             onDrop={handleDrop}
           />
-          {dropInfo?.id === node.id && !dropInfo.before && (
+          {dropInfo?.id === node.id && dropInfo.position === 'after' && (
             <div className="drop-indicator" style={{ marginLeft: `${8 + depth * 16}px` }} />
           )}
         </React.Fragment>
@@ -133,8 +146,8 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
 }
 
 function PageItem({
-  node, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages,
-  dragging, onDragStart, onDragEnd, onDragOver, onDrop,
+  node, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage,
+  dragging, dropInside, onDragStart, onDragEnd, onDragOver, onDrop,
 }: PageItemProps) {
   const [expanded, setExpanded] = useState(true);
   const [hovered, setHovered] = useState(false);
@@ -161,7 +174,7 @@ function PageItem({
   return (
     <div className={`page-tree-item${dragging ? ' page-tree-item--dragging' : ''}`}>
       <div
-        className={`page-row${isSelected ? ' page-row--selected' : ''}`}
+        className={`page-row${isSelected ? ' page-row--selected' : ''}${dropInside ? ' page-row--drop-inside' : ''}`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={() => onSelectPage(node.id)}
         onMouseEnter={() => setHovered(true)}
@@ -214,7 +227,7 @@ function PageItem({
         )}
       </div>
 
-      {hasChildren && expanded && (
+      {(hasChildren || dropInside) && expanded && (
         <PageList
           nodes={node.children}
           parentId={node.id}
@@ -224,13 +237,14 @@ function PageItem({
           onNewPage={onNewPage}
           onDeletePage={onDeletePage}
           onReorderPages={onReorderPages}
+          onReparentPage={onReparentPage}
         />
       )}
     </div>
   );
 }
 
-export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages }: SidebarProps) {
+export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage }: SidebarProps) {
   return (
     <div className="sidebar-content">
       <div className="sidebar-new-page">
@@ -253,6 +267,7 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
             onNewPage={onNewPage}
             onDeletePage={onDeletePage}
             onReorderPages={onReorderPages}
+            onReparentPage={onReparentPage}
           />
         )}
       </nav>

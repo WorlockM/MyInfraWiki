@@ -556,7 +556,6 @@ html, body, #root {
 
 .tiptap-editor {
   max-width: 780px;
-  margin: 0 auto;
 }
 
 .tiptap-editor .ProseMirror {

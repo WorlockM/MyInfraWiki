@@ -153,7 +153,10 @@ export default function App() {
     <div className="app-container">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <img src="/logo.png" alt="MyInfraWiki" className="sidebar-logo" />
+          <div className="sidebar-logo">
+            <img src="/logo-icon.png" alt="" className="sidebar-logo__icon" />
+            <span className="sidebar-logo__text">MyInfraWiki</span>
+          </div>
           <div className="sidebar-header-actions">
             <button
               className="icon-btn"

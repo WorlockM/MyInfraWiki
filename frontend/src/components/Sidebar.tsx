@@ -96,8 +96,14 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
     reset();
   };
 
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDropInfo(null);
+    }
+  };
+
   return (
-    <>
+    <div onDragLeave={handleDragLeave}>
       {nodes.map(node => (
         <React.Fragment key={node.id}>
           {dropInfo?.id === node.id && dropInfo.before && (
@@ -122,7 +128,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
           )}
         </React.Fragment>
       ))}
-    </>
+    </div>
   );
 }
 

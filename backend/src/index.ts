@@ -162,6 +162,14 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
     const newParentId = parent_id !== undefined ? parent_id : existing.parent_id;
     const newPosition = position !== undefined ? position : existing.position;
 
+    // Guard: prevent circular reference (moving a page under its own descendant)
+    if (newParentId && newParentId !== existing.parent_id) {
+      const descendants = getDescendantIds(req.params.id);
+      if (newParentId === req.params.id || descendants.includes(newParentId)) {
+        return res.status(400).json({ error: 'Cannot move a page under its own descendant' });
+      }
+    }
+
     db.prepare(
       'UPDATE pages SET title = ?, content = ?, parent_id = ?, position = ?, updated_at = ? WHERE id = ?'
     ).run(newTitle, newContent, newParentId, newPosition, now, req.params.id);

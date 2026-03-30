@@ -29,6 +29,7 @@ interface PageItemProps {
   onDeletePage: (id: string) => void;
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
   onReparentPage: (pageId: string, newParentId: string | null) => void;
+  isDescendant: (ancestorId: string, targetId: string) => boolean;
   dragging: boolean;
   dropPosition: DropPosition | null;
   onDragStart: (e: React.DragEvent) => void;
@@ -47,12 +48,32 @@ interface PageListProps {
   onDeletePage: (id: string) => void;
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
   onReparentPage: (pageId: string, newParentId: string | null) => void;
+  isDescendant: (ancestorId: string, targetId: string) => boolean;
+}
+
+function collectDescendantIds(node: PageTreeNode): string[] {
+  const ids: string[] = [];
+  for (const child of node.children) {
+    ids.push(child.id);
+    ids.push(...collectDescendantIds(child));
+  }
+  return ids;
+}
+
+function buildDescendantMap(pages: PageTreeNode[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  const visit = (node: PageTreeNode) => {
+    map.set(node.id, collectDescendantIds(node));
+    node.children.forEach(visit);
+  };
+  pages.forEach(visit);
+  return map;
 }
 
 type DropPosition = 'before' | 'after' | 'inside';
 type DropInfo = { id: string; position: DropPosition };
 
-function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage }: PageListProps) {
+function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage, isDescendant }: PageListProps) {
   const draggedIdRef = useRef<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropInfo, setDropInfo] = useState<DropInfo | null>(null);
@@ -96,6 +117,9 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
     const draggedId = draggedIdRef.current || e.dataTransfer.getData('text/plain');
     if (!draggedId || !dropInfo || draggedId === dropInfo.id) { reset(); return; }
 
+    // Guard: never drop a page onto itself or one of its own descendants
+    if (isDescendant(draggedId, dropInfo.id) || draggedId === dropInfo.id) { reset(); return; }
+
     if (dropInfo.position === 'inside') {
       onReparentPage(draggedId, dropInfo.id);
     } else {
@@ -136,6 +160,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
             onDeletePage={onDeletePage}
             onReorderPages={onReorderPages}
             onReparentPage={onReparentPage}
+            isDescendant={isDescendant}
             dragging={draggingId === node.id}
             dropPosition={dropInfo?.id === node.id ? dropInfo.position : null}
             onDragStart={handleDragStart(node.id)}
@@ -151,7 +176,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
 
 function PageItem({
   node, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage,
-  dragging, dropPosition, onDragStart, onDragEnd, onDragOver, onDrop,
+  isDescendant, dragging, dropPosition, onDragStart, onDragEnd, onDragOver, onDrop,
 }: PageItemProps) {
   const [expanded, setExpanded] = useState(true);
   const [hovered, setHovered] = useState(false);
@@ -250,6 +275,7 @@ function PageItem({
           onDeletePage={onDeletePage}
           onReorderPages={onReorderPages}
           onReparentPage={onReparentPage}
+          isDescendant={isDescendant}
         />
       )}
     </div>
@@ -257,6 +283,12 @@ function PageItem({
 }
 
 export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage }: SidebarProps) {
+  const descendantMap = buildDescendantMap(pages);
+
+  const isDescendant = (ancestorId: string, targetId: string): boolean => {
+    return descendantMap.get(ancestorId)?.includes(targetId) ?? false;
+  };
+
   return (
     <div className="sidebar-content">
       <div className="sidebar-new-page">
@@ -280,6 +312,7 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
             onDeletePage={onDeletePage}
             onReorderPages={onReorderPages}
             onReparentPage={onReparentPage}
+            isDescendant={isDescendant}
           />
         )}
       </nav>

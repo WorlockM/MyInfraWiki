@@ -30,7 +30,7 @@ interface PageItemProps {
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
   onReparentPage: (pageId: string, newParentId: string) => void;
   dragging: boolean;
-  dropInside: boolean;
+  dropPosition: DropPosition | null;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -85,7 +85,8 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
     if (draggedIdRef.current === id) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const ratio = (e.clientY - rect.top) / rect.height;
-    const position: DropPosition = ratio < 0.4 ? 'before' : ratio > 0.75 ? 'inside' : 'after';
+    // Top 33% = before, middle 33% = after, bottom 33% = inside (nest as child)
+    const position: DropPosition = ratio < 0.33 ? 'before' : ratio > 0.67 ? 'inside' : 'after';
     setDropInfo(prev => (prev?.id === id && prev.position === position ? prev : { id, position }));
   };
 
@@ -130,18 +131,12 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
             onReorderPages={onReorderPages}
             onReparentPage={onReparentPage}
             dragging={draggingId === node.id}
-            dropInside={dropInfo?.id === node.id && dropInfo.position === 'inside'}
+            dropPosition={dropInfo?.id === node.id ? dropInfo.position : null}
             onDragStart={handleDragStart(node.id)}
             onDragEnd={reset}
             onDragOver={handleDragOver(node.id)}
             onDrop={handleDrop}
           />
-          {dropInfo?.id === node.id && (dropInfo.position === 'after' || dropInfo.position === 'inside') && (
-            <div
-              className="drop-indicator"
-              style={{ marginLeft: `${8 + (dropInfo.position === 'inside' ? depth + 1 : depth) * 16}px` }}
-            />
-          )}
         </React.Fragment>
       ))}
     </div>
@@ -150,7 +145,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
 
 function PageItem({
   node, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage,
-  dragging, dropInside, onDragStart, onDragEnd, onDragOver, onDrop,
+  dragging, dropPosition, onDragStart, onDragEnd, onDragOver, onDrop,
 }: PageItemProps) {
   const [expanded, setExpanded] = useState(true);
   const [hovered, setHovered] = useState(false);
@@ -229,6 +224,14 @@ function PageItem({
           </div>
         )}
       </div>
+
+      {/* Drop indicators rendered directly after the row, not after children */}
+      {dropPosition === 'after' && (
+        <div className="drop-indicator" style={{ marginLeft: `${8 + depth * 16}px` }} />
+      )}
+      {dropPosition === 'inside' && (
+        <div className="drop-indicator" style={{ marginLeft: `${8 + (depth + 1) * 16}px` }} />
+      )}
 
       {hasChildren && expanded && (
         <PageList

@@ -28,7 +28,7 @@ interface PageItemProps {
   onNewPage: (parentId: string | null) => void;
   onDeletePage: (id: string) => void;
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
-  onReparentPage: (pageId: string, newParentId: string) => void;
+  onReparentPage: (pageId: string, newParentId: string | null) => void;
   dragging: boolean;
   dropPosition: DropPosition | null;
   onDragStart: (e: React.DragEvent) => void;

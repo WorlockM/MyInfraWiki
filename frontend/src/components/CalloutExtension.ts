@@ -42,12 +42,15 @@ export const Callout = Node.create({
 
   addCommands() {
     return {
-      insertCallout: (type) => ({ commands }) => {
-        return commands.insertContent({
-          type: this.name,
-          attrs: { type },
-          content: [{ type: 'paragraph' }],
-        })
+      insertCallout: (type) => ({ commands, state }) => {
+        if (state.selection.empty) {
+          return commands.insertContent({
+            type: this.name,
+            attrs: { type },
+            content: [{ type: 'paragraph' }],
+          })
+        }
+        return commands.wrapIn(this.name, { type })
       },
     }
   },

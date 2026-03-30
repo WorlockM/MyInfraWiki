@@ -17,7 +17,7 @@ interface SidebarProps {
   onNewPage: (parentId: string | null) => void;
   onDeletePage: (id: string) => void;
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
-  onReparentPage: (pageId: string, newParentId: string) => void;
+  onReparentPage: (pageId: string, newParentId: string | null) => void;
 }
 
 interface PageItemProps {
@@ -46,7 +46,7 @@ interface PageListProps {
   onNewPage: (parentId: string | null) => void;
   onDeletePage: (id: string) => void;
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
-  onReparentPage: (pageId: string, newParentId: string) => void;
+  onReparentPage: (pageId: string, newParentId: string | null) => void;
 }
 
 type DropPosition = 'before' | 'after' | 'inside';
@@ -82,7 +82,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
   const handleDragOver = (id: string) => (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (draggedIdRef.current === id) return;
+    if (draggedIdRef.current && draggedIdRef.current === id) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const ratio = (e.clientY - rect.top) / rect.height;
     // Top 33% = before, middle 33% = after, bottom 33% = inside (nest as child)
@@ -93,17 +93,23 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const draggedId = draggedIdRef.current;
+    const draggedId = draggedIdRef.current || e.dataTransfer.getData('text/plain');
     if (!draggedId || !dropInfo || draggedId === dropInfo.id) { reset(); return; }
 
     if (dropInfo.position === 'inside') {
       onReparentPage(draggedId, dropInfo.id);
     } else {
-      const newOrder = nodes.map(n => n.id).filter(id => id !== draggedId);
-      const targetIdx = newOrder.indexOf(dropInfo.id);
-      if (targetIdx === -1) { reset(); return; }
-      newOrder.splice(dropInfo.position === 'before' ? targetIdx : targetIdx + 1, 0, draggedId);
-      onReorderPages(parentId, newOrder);
+      const isInThisList = nodes.some(n => n.id === draggedId);
+      if (isInThisList) {
+        const newOrder = nodes.map(n => n.id).filter(id => id !== draggedId);
+        const targetIdx = newOrder.indexOf(dropInfo.id);
+        if (targetIdx === -1) { reset(); return; }
+        newOrder.splice(dropInfo.position === 'before' ? targetIdx : targetIdx + 1, 0, draggedId);
+        onReorderPages(parentId, newOrder);
+      } else {
+        // Dragged from a different level — reparent to this list's level
+        onReparentPage(draggedId, parentId);
+      }
     }
     reset();
   };

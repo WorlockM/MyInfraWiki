@@ -125,7 +125,7 @@ export default function App() {
     }
   };
 
-  const handleReparentPage = useCallback(async (pageId: string, newParentId: string) => {
+  const handleReparentPage = useCallback(async (pageId: string, newParentId: string | null) => {
     try {
       await axios.put(`/api/pages/${pageId}`, { parent_id: newParentId });
       await fetchPages();

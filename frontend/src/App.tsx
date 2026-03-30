@@ -55,6 +55,7 @@ function buildTree(pages: Omit<PageTreeNode, 'children'>[]): PageTreeNode[] {
 export default function App() {
   const [pages, setPages] = useState<PageTreeNode[]>([]);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [newPageId, setNewPageId] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('darkMode') === 'true';
   });
@@ -105,6 +106,7 @@ export default function App() {
         parent_id: parentId,
       });
       await fetchPages();
+      setNewPageId(res.data.id);
       setSelectedPageId(res.data.id);
     } catch (err) {
       console.error('Failed to create page:', err);
@@ -171,6 +173,7 @@ export default function App() {
             key={selectedPageId}
             pageId={selectedPageId}
             onSaved={handlePageSaved}
+            defaultEditing={selectedPageId === newPageId}
           />
         ) : (
           <div className="empty-state">

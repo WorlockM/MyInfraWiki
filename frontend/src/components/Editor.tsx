@@ -38,6 +38,8 @@ import {
   CheckSquare,
   Undo,
   Redo,
+  Pencil,
+  Save,
 } from 'lucide-react';
 
 const lowlight = createLowlight();
@@ -45,6 +47,7 @@ const lowlight = createLowlight();
 interface EditorProps {
   pageId: string;
   onSaved: () => void;
+  defaultEditing?: boolean;
 }
 
 interface PageData {
@@ -263,14 +266,13 @@ async function uploadImage(file: File): Promise<string> {
   return res.data.url;
 }
 
-export default function Editor({ pageId, onSaved }: EditorProps) {
+export default function Editor({ pageId, onSaved, defaultEditing = false }: EditorProps) {
   const [title, setTitle] = useState('');
+  const [isEditing, setIsEditing] = useState(defaultEditing);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [loading, setLoading] = useState(true);
   const [wordCount, setWordCount] = useState(0);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleRef = useRef(title);
-  const pageDataRef = useRef<PageData | null>(null);
 
   titleRef.current = title;
 
@@ -297,9 +299,9 @@ export default function Editor({ pageId, onSaved }: EditorProps) {
       CharacterCount,
     ],
     content: '',
+    editable: defaultEditing,
     onUpdate: ({ editor }) => {
       setWordCount(editor.storage.characterCount?.words() ?? 0);
-      scheduleSave();
     },
     editorProps: {
       handleDrop: (view, event, _slice, moved) => {
@@ -351,6 +353,15 @@ export default function Editor({ pageId, onSaved }: EditorProps) {
     },
   });
 
+  // Sync editable state with TipTap
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(isEditing);
+    if (isEditing) {
+      setTimeout(() => editor.commands.focus('end'), 0);
+    }
+  }, [editor, isEditing]);
+
   // Load page data
   useEffect(() => {
     let cancelled = false;
@@ -360,7 +371,6 @@ export default function Editor({ pageId, onSaved }: EditorProps) {
       .get<PageData>(`/api/pages/${pageId}`)
       .then((res) => {
         if (cancelled) return;
-        pageDataRef.current = res.data;
         setTitle(res.data.title);
         editor?.commands.setContent(res.data.content || '');
         setWordCount(editor?.storage.characterCount?.words() ?? 0);
@@ -395,20 +405,13 @@ export default function Editor({ pageId, onSaved }: EditorProps) {
     }
   }, [editor, pageId, onSaved]);
 
-  const scheduleSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    setSaveStatus('idle');
-    saveTimeoutRef.current = setTimeout(() => {
-      save();
-    }, 2000);
+  const handleSave = useCallback(async () => {
+    await save();
+    setIsEditing(false);
   }, [save]);
 
-  // Save when title changes
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value);
-    scheduleSave();
+  const handleEdit = () => {
+    setIsEditing(true);
   };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -418,14 +421,17 @@ export default function Editor({ pageId, onSaved }: EditorProps) {
     }
   };
 
-  // Cleanup on unmount
+  // Cmd+S / Ctrl+S to save
   useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's' && isEditing) {
+        e.preventDefault();
+        handleSave();
       }
     };
-  }, []);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isEditing, handleSave]);
 
   if (loading) {
     return (
@@ -438,26 +444,43 @@ export default function Editor({ pageId, onSaved }: EditorProps) {
   return (
     <div className="editor-container">
       <div className="editor-header">
-        <input
-          className="editor-title-input"
-          type="text"
-          value={title}
-          onChange={handleTitleChange}
-          onKeyDown={handleTitleKeyDown}
-          placeholder="Untitled"
-          aria-label="Page title"
-        />
+        {isEditing ? (
+          <input
+            className="editor-title-input"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={handleTitleKeyDown}
+            placeholder="Untitled"
+            aria-label="Page title"
+          />
+        ) : (
+          <h1 className="editor-title-view">{title || 'Untitled'}</h1>
+        )}
+
         <div className="editor-meta">
           {saveStatus === 'saving' && <span className="save-status save-status--saving">Saving...</span>}
           {saveStatus === 'saved' && <span className="save-status save-status--saved">Saved</span>}
           {saveStatus === 'error' && <span className="save-status save-status--error">Save failed</span>}
           <span className="word-count">{wordCount} words</span>
+
+          {isEditing ? (
+            <button className="btn-mode btn-mode--save" onClick={handleSave} title="Save (Cmd+S)">
+              <Save size={14} />
+              Save
+            </button>
+          ) : (
+            <button className="btn-mode btn-mode--edit" onClick={handleEdit} title="Edit page">
+              <Pencil size={14} />
+              Edit
+            </button>
+          )}
         </div>
       </div>
 
-      {editor && <Toolbar editor={editor} />}
+      {isEditing && editor && <Toolbar editor={editor} />}
 
-      <div className="editor-content-area">
+      <div className={`editor-content-area ${!isEditing ? 'editor-content-area--readonly' : ''}`}>
         <EditorContent editor={editor} className="tiptap-editor" />
       </div>
     </div>

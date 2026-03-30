@@ -316,7 +316,12 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
       Placeholder.configure({ placeholder: 'Start writing...' }),
       CodeBlockWithCopy,
       Callout,
-      Link.configure({ openOnClick: true, autolink: true }),
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' },
+      }),
       HorizontalRule,
       Table.configure({ resizable: true }),
       TableRow,

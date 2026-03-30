@@ -85,7 +85,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
     if (draggedIdRef.current === id) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const ratio = (e.clientY - rect.top) / rect.height;
-    const position: DropPosition = ratio < 0.25 ? 'before' : ratio > 0.75 ? 'after' : 'inside';
+    const position: DropPosition = ratio < 0.4 ? 'before' : ratio > 0.75 ? 'inside' : 'after';
     setDropInfo(prev => (prev?.id === id && prev.position === position ? prev : { id, position }));
   };
 
@@ -136,8 +136,11 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
             onDragOver={handleDragOver(node.id)}
             onDrop={handleDrop}
           />
-          {dropInfo?.id === node.id && dropInfo.position === 'after' && (
-            <div className="drop-indicator" style={{ marginLeft: `${8 + depth * 16}px` }} />
+          {dropInfo?.id === node.id && (dropInfo.position === 'after' || dropInfo.position === 'inside') && (
+            <div
+              className="drop-indicator"
+              style={{ marginLeft: `${8 + (dropInfo.position === 'inside' ? depth + 1 : depth) * 16}px` }}
+            />
           )}
         </React.Fragment>
       ))}
@@ -174,7 +177,7 @@ function PageItem({
   return (
     <div className={`page-tree-item${dragging ? ' page-tree-item--dragging' : ''}`}>
       <div
-        className={`page-row${isSelected ? ' page-row--selected' : ''}${dropInside ? ' page-row--drop-inside' : ''}`}
+        className={`page-row${isSelected ? ' page-row--selected' : ''}`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={() => onSelectPage(node.id)}
         onMouseEnter={() => setHovered(true)}
@@ -227,7 +230,7 @@ function PageItem({
         )}
       </div>
 
-      {(hasChildren || dropInside) && expanded && (
+      {hasChildren && expanded && (
         <PageList
           nodes={node.children}
           parentId={node.id}

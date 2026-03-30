@@ -202,6 +202,37 @@ html, body, #root {
   color: var(--color-primary);
 }
 
+.page-row__drag-handle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  opacity: 0;
+  cursor: grab;
+  padding: 2px 1px;
+  border-radius: 3px;
+}
+
+.page-row:hover .page-row__drag-handle {
+  opacity: 1;
+}
+
+.page-row__drag-handle:active {
+  cursor: grabbing;
+}
+
+.page-tree-item--dragging > .page-row {
+  opacity: 0.4;
+}
+
+.drop-indicator {
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  margin: 1px 8px 1px 0;
+  pointer-events: none;
+}
+
 .page-row__chevron {
   display: flex;
   align-items: center;
@@ -598,6 +629,12 @@ html, body, #root {
 
 .tiptap-editor .ProseMirror p {
   margin: 0.4em 0;
+}
+
+.tiptap-editor .ProseMirror a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .tiptap-editor .ProseMirror ul,

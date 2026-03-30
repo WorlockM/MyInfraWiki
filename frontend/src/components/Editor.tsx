@@ -15,6 +15,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import Typography from '@tiptap/extension-typography';
 import CharacterCount from '@tiptap/extension-character-count';
+import Link from '@tiptap/extension-link';
 import { CodeBlockWithCopy } from './CodeBlockView';
 import { Callout } from './CalloutExtension';
 import axios from 'axios';
@@ -315,6 +316,7 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
       Placeholder.configure({ placeholder: 'Start writing...' }),
       CodeBlockWithCopy,
       Callout,
+      Link.configure({ openOnClick: true, autolink: true }),
       HorizontalRule,
       Table.configure({ resizable: true }),
       TableRow,

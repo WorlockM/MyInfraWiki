@@ -125,6 +125,17 @@ export default function App() {
     }
   };
 
+  const handleReorderPages = useCallback(async (parentId: string | null, orderedIds: string[]) => {
+    try {
+      await Promise.all(
+        orderedIds.map((id, index) => axios.put(`/api/pages/${id}`, { position: index }))
+      );
+      await fetchPages();
+    } catch (err) {
+      console.error('Failed to reorder pages:', err);
+    }
+  }, [fetchPages]);
+
   const handlePageSaved = useCallback(() => {
     fetchPages();
   }, [fetchPages]);
@@ -163,6 +174,7 @@ export default function App() {
             onSelectPage={setSelectedPageId}
             onNewPage={handleNewPage}
             onDeletePage={handleDeletePage}
+            onReorderPages={handleReorderPages}
           />
         )}
       </aside>

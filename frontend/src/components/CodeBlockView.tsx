@@ -9,7 +9,8 @@ const lowlight = createLowlight();
 function CodeBlockComponent({ node }: { node: { attrs: { language?: string }; textContent: string } }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const text = node.textContent ?? '';
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
@@ -33,7 +34,7 @@ function CodeBlockComponent({ node }: { node: { attrs: { language?: string }; te
       <button
         className={`code-copy-btn ${copied ? 'code-copy-btn--copied' : ''}`}
         onClick={handleCopy}
-        onMouseDown={e => e.preventDefault()}
+        onMouseDown={e => e.stopPropagation()}
         contentEditable={false}
         title="Copy code"
         aria-label="Copy code"

@@ -631,7 +631,7 @@ html, body, #root {
   border-radius: var(--radius);
   padding: 1em 1.2em;
   overflow-x: auto;
-  margin: 1em 0;
+  margin: 0;
 }
 
 .tiptap-editor .ProseMirror pre code {
@@ -639,6 +639,61 @@ html, body, #root {
   padding: 0;
   font-size: 0.875em;
   color: var(--color-text);
+}
+
+/* Code block wrapper with copy button */
+.code-block-wrapper {
+  position: relative;
+  margin: 1em 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.code-block-wrapper:hover .code-copy-btn {
+  opacity: 1;
+}
+
+.code-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: var(--font-sans);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition), background var(--transition), color var(--transition);
+  z-index: 1;
+}
+
+.code-copy-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.code-copy-btn--copied {
+  color: var(--color-success);
+  border-color: var(--color-success);
+  opacity: 1;
+}
+
+.code-block-lang {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  pointer-events: none;
 }
 
 .tiptap-editor .ProseMirror img {

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PageTreeNode } from '../App';
 import {
   ChevronRight,
@@ -55,6 +55,15 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
     setDraggingId(null);
     setDropInfo(null);
   };
+
+  const resetRef = useRef(reset);
+  resetRef.current = reset;
+
+  useEffect(() => {
+    const handler = () => resetRef.current();
+    document.addEventListener('dragend', handler);
+    return () => document.removeEventListener('dragend', handler);
+  }, []);
 
   const handleDragStart = (id: string) => (e: React.DragEvent) => {
     draggedIdRef.current = id;

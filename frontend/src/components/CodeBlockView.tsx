@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import { createLowlight } from 'lowlight';
@@ -6,13 +6,23 @@ import { Check, Copy } from 'lucide-react';
 
 const lowlight = createLowlight();
 
-function CodeBlockComponent({ node }: { node: { attrs: { language?: string } } }) {
+function CodeBlockComponent({ node }: { node: { attrs: { language?: string }; textContent: string } }) {
   const [copied, setCopied] = useState(false);
-  const codeRef = useRef<HTMLElement>(null);
 
   const handleCopy = () => {
-    const text = codeRef.current?.innerText ?? '';
+    const text = node.textContent ?? '';
     navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -23,6 +33,7 @@ function CodeBlockComponent({ node }: { node: { attrs: { language?: string } } }
       <button
         className={`code-copy-btn ${copied ? 'code-copy-btn--copied' : ''}`}
         onClick={handleCopy}
+        onMouseDown={e => e.preventDefault()}
         contentEditable={false}
         title="Copy code"
         aria-label="Copy code"
@@ -36,7 +47,7 @@ function CodeBlockComponent({ node }: { node: { attrs: { language?: string } } }
         </span>
       )}
       <pre>
-        <NodeViewContent as="code" ref={codeRef} />
+        <NodeViewContent as="code" />
       </pre>
     </NodeViewWrapper>
   );

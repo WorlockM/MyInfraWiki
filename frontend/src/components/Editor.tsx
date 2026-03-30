@@ -16,6 +16,7 @@ import TableHeader from '@tiptap/extension-table-header';
 import Typography from '@tiptap/extension-typography';
 import CharacterCount from '@tiptap/extension-character-count';
 import { CodeBlockWithCopy } from './CodeBlockView';
+import { Callout } from './CalloutExtension';
 import axios from 'axios';
 import {
   Bold,
@@ -39,6 +40,9 @@ import {
   Redo,
   Pencil,
   Save,
+  Info,
+  AlertTriangle,
+  AlertCircle,
 } from 'lucide-react';
 
 interface EditorProps {
@@ -250,6 +254,29 @@ function Toolbar({ editor }: { editor: TipTapEditor }) {
           <TableIcon size={15} />
         </ToolbarButton>
       </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <ToolbarButton
+          onClick={() => editor.chain().focus().insertCallout('info').run()}
+          title="Info callout"
+        >
+          <Info size={15} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().insertCallout('warning').run()}
+          title="Warning callout"
+        >
+          <AlertTriangle size={15} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().insertCallout('error').run()}
+          title="Error callout"
+        >
+          <AlertCircle size={15} />
+        </ToolbarButton>
+      </div>
     </div>
   );
 }
@@ -287,6 +314,7 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
       Image.configure({ inline: false, allowBase64: false }),
       Placeholder.configure({ placeholder: 'Start writing...' }),
       CodeBlockWithCopy,
+      Callout,
       HorizontalRule,
       Table.configure({ resizable: true }),
       TableRow,

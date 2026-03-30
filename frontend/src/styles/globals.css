@@ -641,6 +641,57 @@ html, body, #root {
   color: var(--color-text);
 }
 
+/* Callout blocks */
+.callout {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border-left: 4px solid;
+  margin: 1em 0;
+}
+
+.callout::before {
+  flex-shrink: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.callout > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+
+.callout--info {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: #3b82f6;
+}
+.callout--info::before {
+  content: 'ℹ';
+  color: #3b82f6;
+}
+
+.callout--warning {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: #f59e0b;
+}
+.callout--warning::before {
+  content: '⚠';
+  color: #f59e0b;
+}
+
+.callout--error {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: #ef4444;
+}
+.callout--error::before {
+  content: '✕';
+  color: #ef4444;
+}
+
 /* Code block wrapper with copy button */
 .code-block-wrapper {
   position: relative;

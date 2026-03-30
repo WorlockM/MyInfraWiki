@@ -104,10 +104,16 @@ html, body, #root {
 }
 
 .sidebar-logo {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text);
-  letter-spacing: -0.01em;
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  border-radius: 4px;
+  /* multiply blend makes the black background transparent on light sidebar */
+  mix-blend-mode: multiply;
+}
+
+[data-theme="dark"] .sidebar-logo {
+  mix-blend-mode: normal;
 }
 
 .sidebar-header-actions {

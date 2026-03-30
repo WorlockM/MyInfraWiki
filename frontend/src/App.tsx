@@ -3,7 +3,7 @@ import axios from 'axios';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
 import SearchModal from './components/SearchModal';
-import { Moon, Sun, Search } from 'lucide-react';
+import { Moon, Sun, Search, Menu } from 'lucide-react';
 
 export interface PageTreeNode {
   id: string;
@@ -61,6 +61,7 @@ export default function App() {
   });
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Apply dark mode
   useEffect(() => {
@@ -149,9 +150,21 @@ export default function App() {
     fetchPages();
   }, [fetchPages]);
 
+  const handleSelectPage = (id: string) => {
+    setSelectedPageId(id);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="app-container">
-      <aside className="sidebar">
+      {/* Overlay for mobile sidebar */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? ' sidebar-overlay--visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
+      <aside className={`sidebar${sidebarOpen ? ' sidebar--open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo">
             <img src="/logo-icon.png" alt="" className="sidebar-logo__icon" />
@@ -183,7 +196,7 @@ export default function App() {
           <Sidebar
             pages={pages}
             selectedPageId={selectedPageId}
-            onSelectPage={setSelectedPageId}
+            onSelectPage={handleSelectPage}
             onNewPage={handleNewPage}
             onDeletePage={handleDeletePage}
             onReorderPages={handleReorderPages}
@@ -193,6 +206,18 @@ export default function App() {
       </aside>
 
       <main className="main-content">
+        {/* Mobile-only header with hamburger */}
+        <div className="mobile-header">
+          <button
+            className="hamburger-btn icon-btn"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
+          >
+            <Menu size={20} />
+          </button>
+          <span className="sidebar-logo__text">MyInfraWiki</span>
+        </div>
+
         {selectedPageId ? (
           <Editor
             key={selectedPageId}

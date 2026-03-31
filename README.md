@@ -4,31 +4,31 @@
   <img src="frontend/public/logo-icon.png" alt="MyInfraWiki" width="160">
 </p>
 
-**MyInfraWiki** is een zelfgehoste wiki-applicatie, speciaal ontworpen voor het documenteren van infrastructuur. Gebouwd op [TipTap](https://tiptap.dev/), met een moderne editor, donkere modus en volledige ondersteuning voor hiërarchische pagina-structuren.
+**MyInfraWiki** is a self-hosted wiki application designed for documenting infrastructure. Built on [TipTap](https://tiptap.dev/), with a modern rich-text editor, dark mode support, and full hierarchical page structures.
 
 ---
 
 ## Features
 
-- **Rijke teksteditor** – opmaak, headings, lijsten, tabellen, blockquotes, takenlijsten en meer
-- **Codeblokken** – syntax highlighting voor 190+ talen, regelnummers, kopieerknop en taalkeuze
-- **Callout-blokken** – info, waarschuwing en fout, met Confluence-achtige stijl
-- **Hiërarchische pagina's** – pagina's nesten onder andere pagina's via drag-and-drop
-- **Interne paginakoppelingen** – koppel direct naar andere wiki-pagina's
-- **Table of Contents** – automatisch gegenereerd op basis van headings
-- **Pagina-boomstructuur** – toon subpagina's van de huidige pagina
-- **Afbeeldingen** – uploaden via drag-and-drop of plakken vanuit klembord
-- **Automatische URL-herkenning** – geplakte links worden automatisch klikbaar
-- **Bevestiging bij sluiten** – waarschuwing bij niet-opgeslagen wijzigingen
-- **Donkere modus** – volledig ondersteund
+- **Rich text editor** – formatting, headings, lists, tables, blockquotes, task lists and more
+- **Code blocks** – syntax highlighting for 190+ languages, line numbers, copy button and language selector
+- **Callout blocks** – info, warning and error styles, similar to Confluence
+- **Hierarchical pages** – nest pages under other pages via drag-and-drop
+- **Internal page links** – link directly to other wiki pages
+- **Table of Contents** – automatically generated from headings
+- **Page tree** – display child pages of the current page
+- **Images** – upload via drag-and-drop or paste from clipboard
+- **Automatic URL detection** – pasted links are automatically made clickable
+- **Unsaved changes warning** – confirmation dialog when navigating away with unsaved changes
+- **Dark mode** – fully supported
 
 ---
 
-## Snel starten
+## Getting started
 
-### Met Docker Compose (aanbevolen)
+### With Docker Compose (recommended)
 
-Maak een `docker-compose.yml` aan:
+Create a `docker-compose.yml`:
 
 ```yaml
 services:
@@ -49,25 +49,25 @@ volumes:
   wiki-data:
 ```
 
-Start de container:
+Start the container:
 
 ```bash
 docker compose up -d
 ```
 
-MyInfraWiki is nu bereikbaar via [http://localhost:3000](http://localhost:3000).
+MyInfraWiki is now available at [http://localhost:3000](http://localhost:3000).
 
 ---
 
-### Met Docker Run
+### With Docker Run
 
-Bouw eerst de image:
+Build the image first:
 
 ```bash
 docker build -t myinfrawiki .
 ```
 
-Start de container:
+Start the container:
 
 ```bash
 docker run -d \
@@ -84,27 +84,27 @@ docker run -d \
 
 ---
 
-## Omgevingsvariabelen
+## Environment variables
 
-| Variabele       | Standaard         | Omschrijving                          |
-|-----------------|-------------------|---------------------------------------|
-| `PORT`          | `3000`            | Poort waarop de server luistert       |
-| `DATABASE_PATH` | `/data/wiki.db`   | Pad naar de SQLite-database           |
-| `UPLOADS_PATH`  | `/data/uploads`   | Map voor geüploade afbeeldingen       |
-| `NODE_ENV`      | `production`      | Omgeving (`production` / `development`) |
+| Variable        | Default           | Description                              |
+|-----------------|-------------------|------------------------------------------|
+| `PORT`          | `3000`            | Port the server listens on               |
+| `DATABASE_PATH` | `/data/wiki.db`   | Path to the SQLite database file         |
+| `UPLOADS_PATH`  | `/data/uploads`   | Directory for uploaded images            |
+| `NODE_ENV`      | `production`      | Environment (`production` / `development`) |
 
 ---
 
-## Back-up
+## Backup
 
-Alle gegevens worden opgeslagen in het Docker-volume `wiki-data`, onder `/data` in de container:
+All data is stored in the Docker volume `wiki-data`, mounted at `/data` inside the container:
 
-| Bestand/map      | Inhoud                          |
+| Path             | Contents                        |
 |------------------|---------------------------------|
-| `/data/wiki.db`  | Database met alle pagina's      |
-| `/data/uploads/` | Geüploade afbeeldingen          |
+| `/data/wiki.db`  | Database with all pages         |
+| `/data/uploads/` | Uploaded images                 |
 
-**Back-up maken (container hoeft niet gestopt te worden):**
+**Create a backup (container does not need to be stopped):**
 
 ```bash
 # Database
@@ -113,14 +113,14 @@ docker run --rm \
   -v $(pwd):/backup \
   alpine cp /data/wiki.db /backup/wiki.db
 
-# Afbeeldingen
+# Uploads
 docker run --rm \
   -v wiki-data:/data \
   -v $(pwd):/backup \
   alpine cp -r /data/uploads /backup/uploads
 ```
 
-**Herstellen:**
+**Restore:**
 
 ```bash
 docker run --rm \
@@ -138,12 +138,12 @@ docker compose restart myinfrawiki
 
 ---
 
-## Technische stack
+## Tech stack
 
-| Onderdeel  | Technologie                        |
-|------------|------------------------------------|
-| Frontend   | React, TypeScript, TipTap v2       |
-| Backend    | Node.js, Express, TypeScript       |
-| Database   | SQLite (via `better-sqlite3`)       |
-| Bundler    | Vite                               |
-| Container  | Docker (multi-stage build)         |
+| Layer     | Technology                         |
+|-----------|------------------------------------|
+| Frontend  | React, TypeScript, TipTap v2       |
+| Backend   | Node.js, Express, TypeScript       |
+| Database  | SQLite (via `better-sqlite3`)      |
+| Bundler   | Vite                               |
+| Container | Docker (multi-stage build)         |

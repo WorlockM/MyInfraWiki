@@ -151,13 +151,16 @@ html, body, #root {
 .sidebar-new-page {
   padding: 10px 10px 6px;
   flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .btn-new-page {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 100%;
+  flex: 1;
   padding: 7px 10px;
   background: var(--color-primary);
   color: #fff;
@@ -171,6 +174,37 @@ html, body, #root {
 
 .btn-new-page:hover {
   background: var(--color-primary-hover);
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.btn-icon:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.btn-icon--active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.btn-icon--active:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 .page-tree {

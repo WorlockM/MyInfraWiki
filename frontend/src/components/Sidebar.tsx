@@ -8,7 +8,14 @@ import {
   Trash2,
   FilePlus,
   GripVertical,
+  ArrowUpAZ,
 } from 'lucide-react';
+
+function sortAlphabetically(nodes: PageTreeNode[]): PageTreeNode[] {
+  return [...nodes]
+    .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }))
+    .map(n => ({ ...n, children: sortAlphabetically(n.children) }));
+}
 
 interface SidebarProps {
   pages: PageTreeNode[];
@@ -30,6 +37,7 @@ interface PageItemProps {
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
   onReparentPage: (pageId: string, newParentId: string | null) => void;
   isDescendant: (ancestorId: string, targetId: string) => boolean;
+  sortable: boolean;
   dragging: boolean;
   dropPosition: DropPosition | null;
   onDragStart: (e: React.DragEvent) => void;
@@ -49,6 +57,7 @@ interface PageListProps {
   onReorderPages: (parentId: string | null, orderedIds: string[]) => void;
   onReparentPage: (pageId: string, newParentId: string | null) => void;
   isDescendant: (ancestorId: string, targetId: string) => boolean;
+  sortable: boolean;
 }
 
 function collectDescendantIds(node: PageTreeNode): string[] {
@@ -73,7 +82,7 @@ function buildDescendantMap(pages: PageTreeNode[]): Map<string, string[]> {
 type DropPosition = 'before' | 'after' | 'inside';
 type DropInfo = { id: string; position: DropPosition };
 
-function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage, isDescendant }: PageListProps) {
+function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage, isDescendant, sortable }: PageListProps) {
   const draggedIdRef = useRef<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropInfo, setDropInfo] = useState<DropInfo | null>(null);
@@ -161,6 +170,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
             onReorderPages={onReorderPages}
             onReparentPage={onReparentPage}
             isDescendant={isDescendant}
+            sortable={sortable}
             dragging={draggingId === node.id}
             dropPosition={dropInfo?.id === node.id ? dropInfo.position : null}
             onDragStart={handleDragStart(node.id)}
@@ -176,7 +186,7 @@ function PageList({ nodes, parentId, depth, selectedPageId, onSelectPage, onNewP
 
 function PageItem({
   node, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage,
-  isDescendant, dragging, dropPosition, onDragStart, onDragEnd, onDragOver, onDrop,
+  isDescendant, sortable, dragging, dropPosition, onDragStart, onDragEnd, onDragOver, onDrop,
 }: PageItemProps) {
   const [expanded, setExpanded] = useState(true);
   const [hovered, setHovered] = useState(false);
@@ -208,10 +218,10 @@ function PageItem({
         onClick={() => onSelectPage(node.id)}
         onPointerEnter={(e) => { if (e.pointerType !== 'touch') setHovered(true); }}
         onPointerLeave={(e) => { if (e.pointerType !== 'touch') setHovered(false); }}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
+        onDragOver={sortable ? onDragOver : undefined}
+        onDrop={sortable ? onDrop : undefined}
       >
-        <span
+        {sortable && <span
           className="page-row__drag-handle"
           draggable
           onDragStart={onDragStart}
@@ -219,7 +229,7 @@ function PageItem({
           title="Drag to reorder"
         >
           <GripVertical size={13} />
-        </span>
+        </span>}
 
         <button
           className="page-row__chevron"
@@ -257,10 +267,10 @@ function PageItem({
       </div>
 
       {/* Drop indicators rendered directly after the row, not after children */}
-      {dropPosition === 'after' && (
+      {sortable && dropPosition === 'after' && (
         <div className="drop-indicator" style={{ marginLeft: `${8 + depth * 16}px` }} />
       )}
-      {dropPosition === 'inside' && (
+      {sortable && dropPosition === 'inside' && (
         <div className="drop-indicator" style={{ marginLeft: `${8 + (depth + 1) * 16}px` }} />
       )}
 
@@ -276,6 +286,7 @@ function PageItem({
           onReorderPages={onReorderPages}
           onReparentPage={onReparentPage}
           isDescendant={isDescendant}
+          sortable={sortable}
         />
       )}
     </div>
@@ -283,6 +294,17 @@ function PageItem({
 }
 
 export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage }: SidebarProps) {
+  const [sortAlpha, setSortAlpha] = useState<boolean>(() => localStorage.getItem('sortAlpha') === 'true');
+
+  const toggleSort = () => {
+    setSortAlpha(prev => {
+      const next = !prev;
+      localStorage.setItem('sortAlpha', String(next));
+      return next;
+    });
+  };
+
+  const displayedPages = sortAlpha ? sortAlphabetically(pages) : pages;
   const descendantMap = buildDescendantMap(pages);
 
   const isDescendant = (ancestorId: string, targetId: string): boolean => {
@@ -296,14 +318,22 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
           <Plus size={15} />
           <span>New Page</span>
         </button>
+        <button
+          className={`btn-icon${sortAlpha ? ' btn-icon--active' : ''}`}
+          onClick={toggleSort}
+          title={sortAlpha ? 'Alphabetical order (click to switch to manual)' : 'Manual order (click to sort alphabetically)'}
+          aria-label="Toggle alphabetical sort"
+        >
+          <ArrowUpAZ size={15} />
+        </button>
       </div>
 
       <nav className="page-tree" aria-label="Page tree">
-        {pages.length === 0 ? (
+        {displayedPages.length === 0 ? (
           <div className="page-tree-empty">No pages yet</div>
         ) : (
           <PageList
-            nodes={pages}
+            nodes={displayedPages}
             parentId={null}
             depth={0}
             selectedPageId={selectedPageId}
@@ -313,6 +343,7 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
             onReorderPages={onReorderPages}
             onReparentPage={onReparentPage}
             isDescendant={isDescendant}
+            sortable={!sortAlpha}
           />
         )}
       </nav>

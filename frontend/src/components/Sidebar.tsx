@@ -206,8 +206,8 @@ function PageItem({
         className={`page-row${isSelected ? ' page-row--selected' : ''}`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={() => onSelectPage(node.id)}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onPointerEnter={(e) => { if (e.pointerType !== 'touch') setHovered(true); }}
+        onPointerLeave={(e) => { if (e.pointerType !== 'touch') setHovered(false); }}
         onDragOver={onDragOver}
         onDrop={onDrop}
       >

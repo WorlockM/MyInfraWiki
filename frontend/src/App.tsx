@@ -255,8 +255,9 @@ export default function App() {
                 </>
               ) : (
                 <>
+                  <img src="/logo-icon.png" alt="MyInfraWiki" style={{ width: 80, marginBottom: 16 }} />
                   <h2>MyInfraWiki</h2>
-                  <p>Select a page from the sidebar to get started.</p>
+                  <p>Select a page from the sidebar or create a new one to get started.</p>
                 </>
               )}
             </div>

@@ -692,7 +692,7 @@ html, body, #root {
 .tiptap-editor .ProseMirror pre {
   background: var(--color-code-bg);
   border-radius: var(--radius);
-  padding: 0.5em 1.2em;
+  padding: 0.4em 1em;
   overflow-x: auto;
   margin: 0;
   display: flex;
@@ -781,9 +781,8 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 8px;
+  padding: 2px 8px;
   border-bottom: 1px solid var(--color-border);
-  min-height: 30px;
 }
 
 .code-block-wrapper:hover .code-copy-btn {

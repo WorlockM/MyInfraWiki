@@ -1225,6 +1225,7 @@ html, body, #root {
     left: 0;
     top: 0;
     height: 100vh;
+    width: 280px;
     z-index: 50;
     transform: translateX(-100%);
     transition: transform 250ms ease;
@@ -1270,22 +1271,97 @@ html, body, #root {
     height: 32px;
   }
 
+  /* Editor header: smaller title, hide word count */
   .editor-header {
     padding: 16px 16px 0 16px;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
+  .editor-title-input {
+    font-size: 22px;
+  }
+
+  .editor-title-view {
+    font-size: 22px;
+  }
+
+  .word-count {
+    display: none;
+  }
+
+  /* Save/Edit button: icon only on mobile */
+  .btn-mode {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  /* Toolbar: scrollable, compact buttons */
   .editor-toolbar {
-    padding: 8px 16px;
+    padding: 6px 12px;
     overflow-x: auto;
     flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .editor-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar-btn {
+    width: 28px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+
+  .toolbar-divider {
+    margin: 0 2px;
+    flex-shrink: 0;
   }
 
   .editor-content-area {
     padding: 16px 16px 60px 16px;
   }
 
+  /* Tables: horizontal scroll instead of overflow hidden */
+  .tiptap-editor .ProseMirror table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Code blocks: hide line numbers on very small screens */
+  .code-line-numbers {
+    display: none;
+  }
+
+  /* Code block header: smaller */
+  .code-block-header {
+    padding: 3px 6px;
+  }
+
+  /* Callout blocks: tighter on mobile */
+  .callout {
+    padding: 8px 10px;
+  }
+
+  /* Empty state */
+  .empty-state-inner {
+    padding: 24px 16px;
+    max-width: 100%;
+  }
+
+  /* Search modal */
   .search-modal {
     width: calc(100vw - 24px);
+    max-height: 70vh;
+  }
+
+  /* ToC and page tree */
+  .toc-node,
+  .page-tree-node {
+    margin: 0.5em 0;
   }
 }
 

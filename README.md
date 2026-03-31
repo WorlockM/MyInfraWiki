@@ -21,6 +21,7 @@
 - **Automatic URL detection** – pasted links are automatically made clickable
 - **Unsaved changes warning** – confirmation dialog when navigating away with unsaved changes
 - **Dark mode** – fully supported
+- **Mobile-friendly** – responsive layout with slide-in sidebar, touch-optimised toolbar and scrollable tables
 
 ---
 
@@ -33,7 +34,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   myinfrawiki:
-    build: .
+    image: ghcr.io/worlock/myinfrawiki:latest
     ports:
       - "3000:3000"
     volumes:
@@ -61,14 +62,6 @@ MyInfraWiki is now available at [http://localhost:3000](http://localhost:3000).
 
 ### With Docker Run
 
-Build the image first:
-
-```bash
-docker build -t myinfrawiki .
-```
-
-Start the container:
-
 ```bash
 docker run -d \
   --name myinfrawiki \
@@ -79,7 +72,7 @@ docker run -d \
   -e DATABASE_PATH=/data/wiki.db \
   -e UPLOADS_PATH=/data/uploads \
   -e PORT=3000 \
-  myinfrawiki
+  ghcr.io/worlock/myinfrawiki:latest
 ```
 
 ---

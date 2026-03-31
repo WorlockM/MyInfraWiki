@@ -245,11 +245,20 @@ export default function App() {
         ) : (
           <div className="empty-state">
             <div className="empty-state-inner">
-              <h2>Welcome to MyInfraWiki</h2>
-              <p>Select a page from the sidebar or create a new one to get started.</p>
-              <button className="btn-primary" onClick={() => handleNewPage(null)}>
-                Create your first page
-              </button>
+              {pages.length === 0 ? (
+                <>
+                  <h2>Welcome to MyInfraWiki</h2>
+                  <p>Get started by creating your first page.</p>
+                  <button className="btn-primary" onClick={() => handleNewPage(null)}>
+                    Create your first page
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h2>MyInfraWiki</h2>
+                  <p>Select a page from the sidebar to get started.</p>
+                </>
+              )}
             </div>
           </div>
         )}

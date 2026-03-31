@@ -692,9 +692,20 @@ html, body, #root {
 .tiptap-editor .ProseMirror pre {
   background: var(--color-code-bg);
   border-radius: var(--radius);
-  padding: 1em 1.2em;
+  padding: 0.5em 1.2em;
   overflow-x: auto;
   margin: 0;
+  display: flex;
+  gap: 1em;
+}
+
+.code-line-numbers {
+  text-align: right;
+  color: var(--color-text-muted);
+  user-select: none;
+  flex-shrink: 0;
+  min-width: 2ch;
+  opacity: 0.5;
 }
 
 .tiptap-editor .ProseMirror pre code {

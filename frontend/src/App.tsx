@@ -112,6 +112,7 @@ export default function App() {
     (id: string) => {
       if (!confirmIfDirty()) return;
       setSelectedPageId(id);
+      setNewPageId(null);
       setSidebarOpen(false);
     },
     [confirmIfDirty]

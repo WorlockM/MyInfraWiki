@@ -482,6 +482,8 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            onMouseEnter={() => { if (title === 'Untitled') setTitle(''); }}
+            onBlur={() => { if (title === '') setTitle('Untitled'); }}
             onKeyDown={handleTitleKeyDown}
             placeholder="Untitled"
             aria-label="Page title"

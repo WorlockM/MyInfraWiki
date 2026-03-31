@@ -6,7 +6,44 @@ import { Check, Copy } from 'lucide-react';
 
 const lowlight = createLowlight(all);
 
-function CodeBlockComponent({ node }: { node: { attrs: { language?: string }; textContent: string } }) {
+const LANGUAGES = [
+  { value: '',           label: 'Auto' },
+  { value: 'bash',       label: 'Bash / Shell' },
+  { value: 'powershell', label: 'PowerShell' },
+  { value: 'python',     label: 'Python' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'json',       label: 'JSON' },
+  { value: 'yaml',       label: 'YAML' },
+  { value: 'toml',       label: 'TOML' },
+  { value: 'ini',        label: 'INI' },
+  { value: 'dockerfile', label: 'Dockerfile' },
+  { value: 'nginx',      label: 'Nginx' },
+  { value: 'sql',        label: 'SQL' },
+  { value: 'xml',        label: 'XML' },
+  { value: 'html',       label: 'HTML' },
+  { value: 'css',        label: 'CSS' },
+  { value: 'go',         label: 'Go' },
+  { value: 'rust',       label: 'Rust' },
+  { value: 'java',       label: 'Java' },
+  { value: 'csharp',     label: 'C#' },
+  { value: 'cpp',        label: 'C++' },
+  { value: 'php',        label: 'PHP' },
+  { value: 'ruby',       label: 'Ruby' },
+  { value: 'swift',      label: 'Swift' },
+  { value: 'kotlin',     label: 'Kotlin' },
+  { value: 'markdown',   label: 'Markdown' },
+  { value: 'plaintext',  label: 'Plain text' },
+];
+
+interface CodeBlockProps {
+  node: { attrs: { language?: string }; textContent: string };
+  updateAttributes: (attrs: Record<string, unknown>) => void;
+  extension: { options: { editable?: boolean } };
+  editor: { isEditable: boolean };
+}
+
+function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const nodeRef = useRef(node);
@@ -47,23 +84,36 @@ function CodeBlockComponent({ node }: { node: { attrs: { language?: string }; te
     return () => btn.removeEventListener('click', handler);
   }, []);
 
+  const currentLang = node.attrs.language ?? '';
+
   return (
     <NodeViewWrapper className="code-block-wrapper">
-      <button
-        ref={buttonRef}
-        className={`code-copy-btn ${copied ? 'code-copy-btn--copied' : ''}`}
-        contentEditable={false}
-        title="Copy code"
-        aria-label="Copy code"
-      >
-        {copied ? <Check size={13} /> : <Copy size={13} />}
-        {copied ? 'Copied!' : 'Copy'}
-      </button>
-      {node.attrs.language && (
-        <span className="code-block-lang" contentEditable={false}>
-          {node.attrs.language}
-        </span>
-      )}
+      <div className="code-block-header" contentEditable={false}>
+        {editor.isEditable ? (
+          <select
+            className="code-block-lang-select"
+            value={currentLang}
+            onChange={(e) => updateAttributes({ language: e.target.value || null })}
+          >
+            {LANGUAGES.map((lang) => (
+              <option key={lang.value} value={lang.value}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          currentLang && <span className="code-block-lang">{currentLang}</span>
+        )}
+        <button
+          ref={buttonRef}
+          className={`code-copy-btn ${copied ? 'code-copy-btn--copied' : ''}`}
+          title="Copy code"
+          aria-label="Copy code"
+        >
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
       <pre>
         <code className="code-line-numbers" contentEditable={false}>
           {Array.from(
@@ -79,6 +129,6 @@ function CodeBlockComponent({ node }: { node: { attrs: { language?: string }; te
 
 export const CodeBlockWithCopy = CodeBlockLowlight.extend({
   addNodeView() {
-    return ReactNodeViewRenderer(CodeBlockComponent);
+    return ReactNodeViewRenderer(CodeBlockComponent as any);
   },
 }).configure({ lowlight });

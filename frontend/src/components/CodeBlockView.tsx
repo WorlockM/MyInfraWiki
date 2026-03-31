@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
-import { createLowlight } from 'lowlight';
+import { createLowlight, all } from 'lowlight';
 import { Check, Copy } from 'lucide-react';
 
-const lowlight = createLowlight();
+const lowlight = createLowlight(all);
 
 function CodeBlockComponent({ node }: { node: { attrs: { language?: string }; textContent: string } }) {
   const [copied, setCopied] = useState(false);

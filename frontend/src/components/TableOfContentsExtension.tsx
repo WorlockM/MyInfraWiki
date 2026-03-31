@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Node } from '@tiptap/core';
-import { NodeViewWrapper, ReactNodeViewRenderer, useCurrentEditor } from '@tiptap/react';
+import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
+import type { Editor } from '@tiptap/core';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -15,8 +16,7 @@ interface HeadingItem {
   text: string;
 }
 
-function TableOfContentsComponent() {
-  const { editor } = useCurrentEditor();
+function TableOfContentsComponent({ editor }: { editor: Editor }) {
   const [headings, setHeadings] = useState<HeadingItem[]>([]);
 
   useEffect(() => {
@@ -92,11 +92,11 @@ export const TableOfContentsExtension = Node.create({
   },
 
   renderHTML() {
-    return ['div', { 'data-type': 'table-of-contents' }, 0];
+    return ['div', { 'data-type': 'table-of-contents' }];
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(TableOfContentsComponent);
+    return ReactNodeViewRenderer(TableOfContentsComponent as any);
   },
 
   addCommands() {

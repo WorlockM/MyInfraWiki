@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Node } from '@tiptap/core';
-import { NodeViewWrapper, ReactNodeViewRenderer, useCurrentEditor } from '@tiptap/react';
+import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
+import type { Editor } from '@tiptap/core';
 import axios from 'axios';
 
 declare module '@tiptap/core' {
@@ -17,8 +18,7 @@ interface PageItem {
   parent_id: string | null;
 }
 
-function PageTreeComponent() {
-  const { editor } = useCurrentEditor();
+function PageTreeComponent({ editor }: { editor: Editor }) {
   const [childPages, setChildPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -89,11 +89,11 @@ export const PageTreeExtension = Node.create({
   },
 
   renderHTML() {
-    return ['div', { 'data-type': 'page-tree' }, 0];
+    return ['div', { 'data-type': 'page-tree' }];
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(PageTreeComponent);
+    return ReactNodeViewRenderer(PageTreeComponent as any);
   },
 
   addCommands() {

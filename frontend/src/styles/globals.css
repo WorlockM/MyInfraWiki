@@ -700,6 +700,8 @@ html, body, #root {
 }
 
 .code-line-numbers {
+  display: flex;
+  flex-direction: column;
   text-align: right;
   color: var(--color-text-muted);
   user-select: none;

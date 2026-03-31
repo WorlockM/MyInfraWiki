@@ -68,8 +68,8 @@ function CodeBlockComponent({ node }: { node: { attrs: { language?: string }; te
         <code className="code-line-numbers" contentEditable={false}>
           {Array.from(
             { length: Math.max(1, (node.textContent ?? '').split('\n').length) },
-            (_, i) => i + 1
-          ).join('\n')}
+            (_, i) => <span key={i}>{i + 1}</span>
+          )}
         </code>
         <NodeViewContent as="code" />
       </pre>

@@ -434,7 +434,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 20px 48px 0 80px;
+  padding: 20px 48px 0 112px;
   flex-shrink: 0;
 }
 
@@ -595,7 +595,7 @@ html, body, #root {
 .editor-content-area {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 48px 80px 80px;
+  padding: 20px 48px 80px 112px;
 }
 
 .editor-content-area--readonly .ProseMirror {

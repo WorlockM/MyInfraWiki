@@ -489,7 +489,7 @@ export default function Editor({
   // Sync editable state with TipTap
   useEffect(() => {
     if (!editor) return;
-    editor.setEditable(isEditing);
+    editor.setEditable(isEditing, false);
     if (isEditing) {
       setTimeout(() => editor.commands.focus('end'), 0);
     }

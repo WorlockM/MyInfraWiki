@@ -1,6 +1,6 @@
 # MyInfraWiki
 
-<img src="frontend/public/logo-icon.png" alt="MyInfraWiki" width="80">
+<img src="frontend/public/logo-icon.png" alt="MyInfraWiki" width="160">
 
 **MyInfraWiki** is een zelfgehoste wiki-applicatie, speciaal ontworpen voor het documenteren van infrastructuur. Gebouwd op [TipTap](https://tiptap.dev/), met een moderne editor, donkere modus en volledige ondersteuning voor hiërarchische pagina-structuren.
 

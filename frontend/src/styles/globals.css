@@ -1074,6 +1074,98 @@ html, body, #root {
   color: var(--color-text-secondary);
 }
 
+/* ─── Wiki Link ─────────────────────────────────────────────────────────────── */
+.wiki-link {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+  cursor: pointer;
+  font-weight: 500;
+}
+.wiki-link:hover {
+  text-decoration: underline;
+}
+
+/* ─── Table of Contents Node ────────────────────────────────────────────────── */
+.toc-node {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  background: var(--color-bg-secondary);
+  margin: 1em 0;
+}
+.toc-node__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+.toc-node ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.toc-node__item {
+  font-size: 13px;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+.toc-node__item:hover {
+  text-decoration: underline;
+}
+
+/* ─── Page Tree Node ────────────────────────────────────────────────────────── */
+.page-tree-node {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  background: var(--color-bg-secondary);
+  margin: 1em 0;
+}
+.page-tree-node__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+.page-tree-node ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.page-tree-node__link {
+  font-size: 13px;
+  color: var(--color-primary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+.page-tree-node__link:hover {
+  text-decoration: underline;
+}
+
+/* ─── Title Error ───────────────────────────────────────────────────────────── */
+.title-error {
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 4px;
+  margin-left: 0;
+}
+
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;

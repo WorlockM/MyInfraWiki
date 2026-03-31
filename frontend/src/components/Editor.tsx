@@ -18,6 +18,10 @@ import CharacterCount from '@tiptap/extension-character-count';
 import Link from '@tiptap/extension-link';
 import { CodeBlockWithCopy } from './CodeBlockView';
 import { Callout } from './CalloutExtension';
+import { WikiLinkExtension } from './WikiLinkExtension';
+import { TableOfContentsExtension } from './TableOfContentsExtension';
+import { PageTreeExtension } from './PageTreeExtension';
+import WikiLinkModal from './WikiLinkModal';
 import axios from 'axios';
 import {
   Bold,
@@ -44,12 +48,18 @@ import {
   Info,
   AlertTriangle,
   AlertCircle,
+  Link as LinkIcon,
+  BookOpen,
+  Network,
 } from 'lucide-react';
 
 interface EditorProps {
   pageId: string;
   onSaved: () => void;
   defaultEditing?: boolean;
+  onNavigate?: (pageId: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onRegisterDirtyCheck?: (fn: () => boolean) => void;
 }
 
 interface PageData {
@@ -83,7 +93,12 @@ function ToolbarButton({ onClick, active, title, children, disabled }: ToolbarBu
   );
 }
 
-function Toolbar({ editor }: { editor: TipTapEditor }) {
+interface ToolbarProps {
+  editor: TipTapEditor;
+  onWikiLink: () => void;
+}
+
+function Toolbar({ editor, onWikiLink }: ToolbarProps) {
   return (
     <div className="editor-toolbar">
       <div className="toolbar-group">
@@ -278,6 +293,30 @@ function Toolbar({ editor }: { editor: TipTapEditor }) {
           <AlertCircle size={15} />
         </ToolbarButton>
       </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <ToolbarButton
+          onClick={onWikiLink}
+          active={editor.isActive('wikiLink')}
+          title="Internal page link"
+        >
+          <LinkIcon size={15} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().insertTableOfContents().run()}
+          title="Table of Contents"
+        >
+          <BookOpen size={15} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().insertPageTree().run()}
+          title="Child pages"
+        >
+          <Network size={15} />
+        </ToolbarButton>
+      </div>
     </div>
   );
 }
@@ -291,15 +330,54 @@ async function uploadImage(file: File): Promise<string> {
   return res.data.url;
 }
 
-export default function Editor({ pageId, onSaved, defaultEditing = false }: EditorProps) {
+export default function Editor({
+  pageId,
+  onSaved,
+  defaultEditing = false,
+  onNavigate,
+  onDirtyChange,
+  onRegisterDirtyCheck,
+}: EditorProps) {
   const [title, setTitle] = useState('');
   const [isEditing, setIsEditing] = useState(defaultEditing);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [loading, setLoading] = useState(true);
   const [wordCount, setWordCount] = useState(0);
-  const titleRef = useRef(title);
+  const [wikiLinkModalOpen, setWikiLinkModalOpen] = useState(false);
+  const [titleError, setTitleError] = useState('');
 
+  const titleRef = useRef(title);
   titleRef.current = title;
+
+  const isDirtyRef = useRef(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const setDirty = useCallback(
+    (dirty: boolean) => {
+      isDirtyRef.current = dirty;
+      onDirtyChange?.(dirty);
+    },
+    [onDirtyChange]
+  );
+
+  // Register dirty check function for parent
+  useEffect(() => {
+    if (onRegisterDirtyCheck) {
+      onRegisterDirtyCheck(() => isDirtyRef.current);
+    }
+  }, [onRegisterDirtyCheck]);
+
+  // beforeunload warning when dirty
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -316,6 +394,9 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
       Placeholder.configure({ placeholder: 'Start writing...' }),
       CodeBlockWithCopy,
       Callout,
+      WikiLinkExtension,
+      TableOfContentsExtension,
+      PageTreeExtension,
       Link.configure({
         openOnClick: true,
         autolink: true,
@@ -334,8 +415,21 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
     editable: defaultEditing,
     onUpdate: ({ editor }) => {
       setWordCount(editor.storage.characterCount?.words() ?? 0);
+      setDirty(true);
     },
     editorProps: {
+      handleClick: (_view, _pos, event) => {
+        const target = event.target as HTMLElement;
+        const wikiLinkEl = target.closest('.wiki-link') as HTMLElement | null;
+        if (wikiLinkEl) {
+          const pageId = wikiLinkEl.getAttribute('data-page-id');
+          if (pageId && onNavigate) {
+            onNavigate(pageId);
+            return true;
+          }
+        }
+        return false;
+      },
       handleDrop: (view, event, _slice, moved) => {
         if (!moved && event.dataTransfer?.files.length) {
           const files = Array.from(event.dataTransfer.files).filter((f) =>
@@ -385,6 +479,13 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
     },
   });
 
+  // Keep pageTree storage up to date
+  useEffect(() => {
+    if (!editor) return;
+    editor.storage.pageTree.currentPageId = pageId;
+    editor.storage.pageTree.onNavigate = onNavigate ?? null;
+  }, [editor, pageId, onNavigate]);
+
   // Sync editable state with TipTap
   useEffect(() => {
     if (!editor) return;
@@ -398,6 +499,7 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setDirty(false);
 
     axios
       .get<PageData>(`/api/pages/${pageId}`)
@@ -407,6 +509,7 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
         editor?.commands.setContent(res.data.content || '');
         setWordCount(editor?.storage.characterCount?.words() ?? 0);
         setLoading(false);
+        setDirty(false);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -418,26 +521,42 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
     return () => {
       cancelled = true;
     };
-  }, [pageId, editor]);
+  }, [pageId, editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = useCallback(async () => {
     if (!editor) return;
+
+    const currentTitle = titleRef.current.trim();
+    if (!currentTitle) {
+      setTitleError('Page title cannot be empty');
+      titleInputRef.current?.focus();
+      return;
+    }
+
+    setTitleError('');
     setSaveStatus('saving');
     try {
       await axios.put(`/api/pages/${pageId}`, {
-        title: titleRef.current,
+        title: currentTitle,
         content: editor.getHTML(),
       });
       setSaveStatus('saved');
+      setDirty(false);
       onSaved();
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
       console.error('Failed to save page:', err);
       setSaveStatus('error');
     }
-  }, [editor, pageId, onSaved]);
+  }, [editor, pageId, onSaved, setDirty]);
 
   const handleSave = useCallback(async () => {
+    const currentTitle = titleRef.current.trim();
+    if (!currentTitle) {
+      setTitleError('Page title cannot be empty');
+      titleInputRef.current?.focus();
+      return;
+    }
     await save();
     setIsEditing(false);
   }, [save]);
@@ -446,12 +565,55 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
     setIsEditing(true);
   };
 
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTitle(e.target.value);
+    setDirty(true);
+    if (e.target.value.trim()) {
+      setTitleError('');
+    }
+  };
+
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       editor?.commands.focus();
     }
   };
+
+  const handleWikiLinkSelect = useCallback(
+    (selectedPageId: string, selectedPageTitle: string) => {
+      setWikiLinkModalOpen(false);
+      if (!editor) return;
+
+      const { state } = editor;
+      const { selection } = state;
+      const hasSelection = !selection.empty;
+
+      if (hasSelection) {
+        editor
+          .chain()
+          .focus()
+          .setWikiLink({ pageId: selectedPageId, pageTitle: selectedPageTitle })
+          .run();
+      } else {
+        editor
+          .chain()
+          .focus()
+          .insertContent({
+            type: 'text',
+            text: selectedPageTitle,
+            marks: [
+              {
+                type: 'wikiLink',
+                attrs: { pageId: selectedPageId, pageTitle: selectedPageTitle },
+              },
+            ],
+          })
+          .run();
+      }
+    },
+    [editor]
+  );
 
   // Cmd+S / Ctrl+S to save
   useEffect(() => {
@@ -476,21 +638,27 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
   return (
     <div className="editor-container">
       <div className="editor-header">
-        {isEditing ? (
-          <input
-            className="editor-title-input"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onMouseEnter={() => { if (title === 'Untitled') setTitle(''); }}
-            onBlur={() => { if (title === '') setTitle('Untitled'); }}
-            onKeyDown={handleTitleKeyDown}
-            placeholder="Untitled"
-            aria-label="Page title"
-          />
-        ) : (
-          <h1 className="editor-title-view">{title || 'Untitled'}</h1>
-        )}
+        <div style={{ flex: 1 }}>
+          {isEditing ? (
+            <>
+              <input
+                ref={titleInputRef}
+                className="editor-title-input"
+                type="text"
+                value={title}
+                onChange={handleTitleChange}
+                onMouseEnter={() => { if (title === 'Untitled') setTitle(''); }}
+                onBlur={() => { if (title === '') setTitle('Untitled'); }}
+                onKeyDown={handleTitleKeyDown}
+                placeholder="Untitled"
+                aria-label="Page title"
+              />
+              {titleError && <div className="title-error">{titleError}</div>}
+            </>
+          ) : (
+            <h1 className="editor-title-view">{title || 'Untitled'}</h1>
+          )}
+        </div>
 
         <div className="editor-meta">
           {saveStatus === 'saving' && <span className="save-status save-status--saving">Saving...</span>}
@@ -512,11 +680,18 @@ export default function Editor({ pageId, onSaved, defaultEditing = false }: Edit
         </div>
       </div>
 
-      {isEditing && editor && <Toolbar editor={editor} />}
+      {isEditing && editor && <Toolbar editor={editor} onWikiLink={() => setWikiLinkModalOpen(true)} />}
 
       <div className={`editor-content-area ${!isEditing ? 'editor-content-area--readonly' : ''}`}>
         <EditorContent editor={editor} className="tiptap-editor" />
       </div>
+
+      {wikiLinkModalOpen && (
+        <WikiLinkModal
+          onClose={() => setWikiLinkModalOpen(false)}
+          onSelect={handleWikiLinkSelect}
+        />
+      )}
     </div>
   );
 }

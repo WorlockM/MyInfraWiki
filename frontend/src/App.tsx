@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
@@ -63,6 +63,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const editorDirtyCheckRef = useRef<() => boolean>(() => false);
+
   // Apply dark mode
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
@@ -99,7 +101,24 @@ export default function App() {
     fetchPages();
   }, [fetchPages]);
 
+  const confirmIfDirty = useCallback((): boolean => {
+    if (editorDirtyCheckRef.current()) {
+      return window.confirm('You have unsaved changes. Are you sure you want to leave?');
+    }
+    return true;
+  }, []);
+
+  const handleSelectPage = useCallback(
+    (id: string) => {
+      if (!confirmIfDirty()) return;
+      setSelectedPageId(id);
+      setSidebarOpen(false);
+    },
+    [confirmIfDirty]
+  );
+
   const handleNewPage = async (parentId: string | null = null) => {
+    if (!confirmIfDirty()) return;
     try {
       const res = await axios.post<PageData>('/api/pages', {
         title: 'Untitled',
@@ -149,11 +168,6 @@ export default function App() {
   const handlePageSaved = useCallback(() => {
     fetchPages();
   }, [fetchPages]);
-
-  const handleSelectPage = (id: string) => {
-    setSelectedPageId(id);
-    setSidebarOpen(false);
-  };
 
   return (
     <div className="app-container">
@@ -224,6 +238,8 @@ export default function App() {
             pageId={selectedPageId}
             onSaved={handlePageSaved}
             defaultEditing={selectedPageId === newPageId}
+            onNavigate={handleSelectPage}
+            onRegisterDirtyCheck={(fn) => { editorDirtyCheckRef.current = fn; }}
           />
         ) : (
           <div className="empty-state">
@@ -242,7 +258,7 @@ export default function App() {
         <SearchModal
           onClose={() => setSearchOpen(false)}
           onSelectPage={(id) => {
-            setSelectedPageId(id);
+            handleSelectPage(id);
             setSearchOpen(false);
           }}
         />

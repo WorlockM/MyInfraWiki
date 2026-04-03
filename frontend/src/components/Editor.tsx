@@ -571,6 +571,10 @@ export default function Editor({
   };
 
   const handleCancel = () => {
+    if (isDirtyRef.current) {
+      const confirmed = window.confirm('Are you sure you want to discard your changes? All unsaved changes will be lost.');
+      if (!confirmed) return;
+    }
     setTitle(originalTitleRef.current);
     setTitleError('');
     editor?.commands.setContent(originalContentRef.current);

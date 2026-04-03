@@ -561,6 +561,17 @@ html, body, #root {
   background: var(--color-primary-hover);
 }
 
+.btn-mode--cancel {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.btn-mode--cancel:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+}
+
 /* ─── Toolbar ───────────────────────────────────────────────────────────────── */
 .editor-toolbar {
   display: flex;

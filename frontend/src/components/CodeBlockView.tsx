@@ -45,9 +45,30 @@ interface CodeBlockProps {
 
 function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const [lineCount, setLineCount] = useState(() =>
+    Math.max(1, (node.textContent ?? '').split('\n').length)
+  );
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
   const nodeRef = useRef(node);
   nodeRef.current = node;
+
+  useEffect(() => {
+    const pre = preRef.current;
+    if (!pre) return;
+
+    const getCount = () => {
+      const codeEl = pre.querySelector('code:not(.code-line-numbers)');
+      const text = codeEl?.textContent ?? '';
+      return Math.max(1, text.split('\n').length);
+    };
+
+    setLineCount(getCount());
+
+    const observer = new MutationObserver(() => setLineCount(getCount()));
+    observer.observe(pre, { characterData: true, subtree: true, childList: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const btn = buttonRef.current;
@@ -114,12 +135,11 @@ function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) 
           {copied ? 'Copied!' : 'Copy'}
         </button>
       </div>
-      <pre>
+      <pre ref={preRef}>
         <code className="code-line-numbers" contentEditable={false}>
-          {Array.from(
-            { length: Math.max(1, (node.textContent ?? '').split('\n').length) },
-            (_, i) => <span key={i}>{i + 1}</span>
-          )}
+          {Array.from({ length: lineCount }, (_, i) => (
+            <span key={i}>{i + 1}</span>
+          ))}
         </code>
         <NodeViewContent as="code" />
       </pre>

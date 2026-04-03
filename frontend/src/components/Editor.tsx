@@ -45,6 +45,7 @@ import {
   Redo,
   Pencil,
   Save,
+  X,
   Info,
   AlertTriangle,
   AlertCircle,
@@ -351,6 +352,8 @@ export default function Editor({
 
   const isDirtyRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const originalTitleRef = useRef('');
+  const originalContentRef = useRef('');
 
   const setDirty = useCallback(
     (dirty: boolean) => {
@@ -562,7 +565,17 @@ export default function Editor({
   }, [save]);
 
   const handleEdit = () => {
+    originalTitleRef.current = titleRef.current;
+    originalContentRef.current = editor?.getHTML() ?? '';
     setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    setTitle(originalTitleRef.current);
+    setTitleError('');
+    editor?.commands.setContent(originalContentRef.current);
+    setDirty(false);
+    setIsEditing(false);
   };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -667,10 +680,16 @@ export default function Editor({
           <span className="word-count">{wordCount} words</span>
 
           {isEditing ? (
-            <button className="btn-mode btn-mode--save" onClick={handleSave} title="Save (Cmd+S)">
-              <Save size={14} />
-              Save
-            </button>
+            <>
+              <button className="btn-mode btn-mode--cancel" onClick={handleCancel} title="Discard changes">
+                <X size={14} />
+                Cancel
+              </button>
+              <button className="btn-mode btn-mode--save" onClick={handleSave} title="Save (Cmd+S)">
+                <Save size={14} />
+                Save
+              </button>
+            </>
           ) : (
             <button className="btn-mode btn-mode--edit" onClick={handleEdit} title="Edit page">
               <Pencil size={14} />

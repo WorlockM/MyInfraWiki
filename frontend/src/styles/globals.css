@@ -144,8 +144,7 @@ html, body, #root {
 .sidebar-version {
   padding: 8px 12px;
   font-size: 11px;
-  color: var(--color-text-muted);
-  opacity: 0.75;
+  color: var(--color-text-secondary);
   user-select: none;
   flex-shrink: 0;
 }
@@ -771,6 +770,23 @@ html, body, #root {
   color: var(--color-text);
   white-space: pre;
   flex-shrink: 0;
+}
+
+.tiptap-editor .ProseMirror pre::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tiptap-editor .ProseMirror pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tiptap-editor .ProseMirror pre::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.5);
+  border-radius: 3px;
+}
+
+.tiptap-editor .ProseMirror pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.8);
 }
 
 /* Callout blocks */

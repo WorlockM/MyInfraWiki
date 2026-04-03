@@ -141,6 +141,15 @@ html, body, #root {
   font-size: 13px;
 }
 
+.sidebar-version {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+}
+
 .sidebar-content {
   display: flex;
   flex-direction: column;

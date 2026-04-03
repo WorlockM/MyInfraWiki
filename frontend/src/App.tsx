@@ -218,6 +218,7 @@ export default function App() {
             onReparentPage={handleReparentPage}
           />
         )}
+        <div className="sidebar-version">{__APP_VERSION__}</div>
       </aside>
 
       <main className="main-content">

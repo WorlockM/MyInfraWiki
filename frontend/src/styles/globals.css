@@ -772,6 +772,11 @@ html, body, #root {
   flex-shrink: 0;
 }
 
+.tiptap-editor .ProseMirror pre {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(160, 160, 160, 0.8) transparent;
+}
+
 .tiptap-editor .ProseMirror pre::-webkit-scrollbar {
   height: 6px;
 }

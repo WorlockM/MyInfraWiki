@@ -34,7 +34,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   myinfrawiki:
-    image: ghcr.io/worlock/myinfrawiki:latest
+    image: ghcr.io/worlockm/myinfrawiki:latest
     ports:
       - "3000:3000"
     volumes:
@@ -72,7 +72,7 @@ docker run -d \
   -e DATABASE_PATH=/data/wiki.db \
   -e UPLOADS_PATH=/data/uploads \
   -e PORT=3000 \
-  ghcr.io/worlock/myinfrawiki:latest
+  ghcr.io/worlockm/myinfrawiki:latest
 ```
 
 ---

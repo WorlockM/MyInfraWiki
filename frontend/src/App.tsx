@@ -218,7 +218,7 @@ export default function App() {
             onReparentPage={handleReparentPage}
           />
         )}
-        <div className="sidebar-version">{__APP_VERSION__}</div>
+        <div className="sidebar-version">{__APP_VERSION__} ({__APP_COMMIT__})</div>
       </aside>
 
       <main className="main-content">

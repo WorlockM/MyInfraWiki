@@ -5,7 +5,9 @@ COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
 ARG APP_VERSION=dev
+ARG APP_COMMIT=unknown
 ENV VITE_APP_VERSION=$APP_VERSION
+ENV VITE_APP_COMMIT=$APP_COMMIT
 RUN npm run build
 
 # Stage 2: Build backend

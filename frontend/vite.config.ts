@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(process.env.VITE_APP_VERSION ?? 'dev'),
+    __APP_COMMIT__: JSON.stringify((process.env.VITE_APP_COMMIT ?? 'local').slice(0, 7)),
   },
   server: {
     port: 3000,

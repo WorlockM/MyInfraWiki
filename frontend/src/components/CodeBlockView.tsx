@@ -9,7 +9,7 @@ const lowlight = createLowlight(all);
 
 // ─── Mermaid diagram renderer ─────────────────────────────────────────────────
 
-function getMermaidTheme() {
+function getMermaidTheme(): 'dark' | 'default' {
   return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
 }
 

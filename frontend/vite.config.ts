@@ -20,15 +20,8 @@ export default defineConfig({
       },
     },
   },
-  optimizeDeps: {
-    include: ['mermaid'],
-  },
   build: {
     outDir: 'dist',
     sourcemap: false,
-    commonjsOptions: {
-      include: [/node_modules/],
-      transformMixedEsModules: true,
-    },
   },
 });

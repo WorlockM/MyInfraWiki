@@ -728,6 +728,7 @@ export default function Editor({
       {historyOpen && (
         <HistoryModal
           pageId={pageId}
+          currentContent={editor?.getHTML() ?? ''}
           onClose={() => setHistoryOpen(false)}
           onRestored={() => {
             setHistoryOpen(false);

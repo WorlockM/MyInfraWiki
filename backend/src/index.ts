@@ -188,8 +188,10 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
     const newParentId = parent_id !== undefined ? parent_id : existing.parent_id;
     const newPosition = position !== undefined ? position : existing.position;
 
-    // Save a version snapshot when title or content actually changes
-    if ((title !== undefined && title !== existing.title) || (content !== undefined && content !== existing.content)) {
+    // Save a version snapshot when title or content actually changes,
+    // but skip the very first save of a new page (still at default state)
+    const isNewPage = existing.title === 'Untitled' && existing.content === '';
+    if (!isNewPage && ((title !== undefined && title !== existing.title) || (content !== undefined && content !== existing.content))) {
       saveVersion(req.params.id, existing.title, existing.content);
     }
 

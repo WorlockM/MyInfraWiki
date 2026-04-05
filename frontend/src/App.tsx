@@ -57,7 +57,9 @@ export default function App() {
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [newPageId, setNewPageId] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    return localStorage.getItem('darkMode') === 'true';
+    const stored = localStorage.getItem('darkMode');
+    if (stored !== null) return stored === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);

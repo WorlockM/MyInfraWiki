@@ -41,16 +41,15 @@ function MermaidDiagram({ code }: { code: string }) {
 
     mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'loose' });
 
-    // Defer to next microtask so the DOM is ready after TipTap's editable toggle
-    Promise.resolve().then(() =>
-      mermaid
-        .render(id, code.trim())
-        .then(({ svg: rendered }) => { setSvg(rendered); })
-        .catch((err: unknown) => {
-          setError(String(err instanceof Error ? err.message : err).split('\n')[0]);
-        })
-        .finally(() => { document.getElementById(id)?.remove(); })
-    );
+    // v9 uses a synchronous string-returning API
+    try {
+      const rendered = mermaid.render(id, code.trim());
+      setSvg(rendered);
+    } catch (err: unknown) {
+      setError(String(err instanceof Error ? err.message : err).split('\n')[0]);
+    } finally {
+      document.getElementById(id)?.remove();
+    }
   }, [code, theme]);
 
   if (error) return (

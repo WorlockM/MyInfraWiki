@@ -83,7 +83,7 @@ interface CodeBlockProps {
   node: { attrs: { language?: string }; textContent: string };
   updateAttributes: (attrs: Record<string, unknown>) => void;
   extension: { options: { editable?: boolean } };
-  editor: { isEditable: boolean };
+  editor: { isEditable: boolean; on: (event: string, cb: () => void) => void; off: (event: string, cb: () => void) => void };
 }
 
 function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) {
@@ -97,10 +97,12 @@ function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) 
   const nodeRef = useRef(node);
   nodeRef.current = node;
 
-  // Track editor editable state changes
+  // Track editor editable state by listening to TipTap's transaction events
   useEffect(() => {
-    setIsEditable(editor.isEditable);
-  }, [editor.isEditable]);
+    const update = () => setIsEditable(editor.isEditable);
+    editor.on('transaction', update);
+    return () => editor.off('transaction', update);
+  }, [editor]);
 
   useEffect(() => {
     const pre = preRef.current;

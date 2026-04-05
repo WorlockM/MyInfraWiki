@@ -25,6 +25,26 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// Strip HTML tags and decode common entities to plain text
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Build a safe FTS5 MATCH expression from user input
+function buildFtsQuery(q: string): string {
+  const words = q.replace(/["'*^(){}[\]|\\]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return words.map((w) => `${w}*`).join(' ');
+}
+
 // Initialize database schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS pages (
@@ -45,7 +65,26 @@ db.exec(`
     saved_at TEXT NOT NULL,
     version_number INTEGER NOT NULL
   );
+
+  CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
+    page_id UNINDEXED,
+    title,
+    body,
+    tokenize='unicode61'
+  );
 `);
+
+// Rebuild the FTS index from the pages table on every startup
+{
+  const ftsInsert = db.prepare('INSERT INTO pages_fts(page_id, title, body) VALUES (?, ?, ?)');
+  const allPages = db.prepare('SELECT id, title, content FROM pages').all() as { id: string; title: string; content: string }[];
+  db.transaction(() => {
+    db.exec('DELETE FROM pages_fts');
+    for (const p of allPages) {
+      ftsInsert.run(p.id, p.title, stripHtml(p.content));
+    }
+  })();
+}
 
 // Middleware
 app.use(cors());
@@ -94,6 +133,16 @@ function saveVersion(pageId: string, title: string, content: string) {
     const del = db.prepare('DELETE FROM page_versions WHERE id = ?');
     db.transaction(() => { for (const v of old) del.run(v.id); })();
   }
+}
+
+// Helper: keep FTS index in sync
+function ftsUpdate(pageId: string, title: string, content: string) {
+  db.prepare('DELETE FROM pages_fts WHERE page_id = ?').run(pageId);
+  db.prepare('INSERT INTO pages_fts(page_id, title, body) VALUES (?, ?, ?)').run(pageId, title, stripHtml(content));
+}
+
+function ftsDelete(pageId: string) {
+  db.prepare('DELETE FROM pages_fts WHERE page_id = ?').run(pageId);
 }
 
 // Helper: get all descendant IDs for a page
@@ -158,6 +207,7 @@ app.post('/api/pages', (req: Request, res: Response) => {
     ).run(id, title, content, parent_id, position, now, now);
 
     const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(id);
+    ftsUpdate(id, title, content);
     res.status(201).json(page);
   } catch (err) {
     console.error('Error creating page:', err);
@@ -208,6 +258,7 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
     ).run(newTitle, newContent, newParentId, newPosition, now, req.params.id);
 
     const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
+    ftsUpdate(req.params.id, newTitle, newContent);
     res.json(page);
   } catch (err) {
     console.error('Error updating page:', err);
@@ -233,6 +284,7 @@ app.delete('/api/pages/:id', (req: Request, res: Response) => {
       }
     });
     deleteMany(allIds);
+    for (const id of allIds) ftsDelete(id);
 
     res.json({ success: true, deleted: allIds.length });
   } catch (err) {
@@ -291,6 +343,7 @@ app.post('/api/pages/:id/restore/:versionId', (req: Request, res: Response) => {
 
     const now = new Date().toISOString();
     db.prepare('UPDATE pages SET title = ?, content = ?, updated_at = ? WHERE id = ?').run(version.title, version.content, now, req.params.id);
+    ftsUpdate(req.params.id, version.title, version.content);
 
     const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
     res.json(page);
@@ -316,44 +369,27 @@ app.get('/api/pages/:id/backlinks', (req: Request, res: Response) => {
   }
 });
 
-// GET /api/search?q=query - full text search
+// GET /api/search?q=query - full text search via FTS5
 app.get('/api/search', (req: Request, res: Response) => {
   try {
     const q = (req.query.q as string || '').trim();
-    if (!q) {
-      return res.json([]);
-    }
+    if (!q) return res.json([]);
 
-    const searchTerm = `%${q}%`;
+    const ftsQ = buildFtsQuery(q);
+    if (!ftsQ) return res.json([]);
+
     const results = db
       .prepare(
-        `SELECT id, title, content FROM pages
-         WHERE title LIKE ? OR content LIKE ?
-         ORDER BY
-           CASE WHEN title LIKE ? THEN 0 ELSE 1 END,
-           updated_at DESC
+        `SELECT page_id AS id, title,
+           snippet(pages_fts, 2, '', '', '...', 30) AS snippet
+         FROM pages_fts
+         WHERE pages_fts MATCH ?
+         ORDER BY rank
          LIMIT 20`
       )
-      .all(searchTerm, searchTerm, searchTerm) as { id: string; title: string; content: string }[];
+      .all(ftsQ) as { id: string; title: string; snippet: string }[];
 
-    const formatted = results.map((row) => {
-      // Extract a snippet around the match
-      let snippet = '';
-      const contentLower = row.content.toLowerCase();
-      const qLower = q.toLowerCase();
-      const idx = contentLower.indexOf(qLower);
-      if (idx !== -1) {
-        const start = Math.max(0, idx - 60);
-        const end = Math.min(row.content.length, idx + q.length + 60);
-        snippet = (start > 0 ? '...' : '') + row.content.slice(start, end).replace(/<[^>]+>/g, '') + (end < row.content.length ? '...' : '');
-      } else {
-        // Use beginning of content as snippet
-        snippet = row.content.replace(/<[^>]+>/g, '').slice(0, 120) + (row.content.length > 120 ? '...' : '');
-      }
-      return { id: row.id, title: row.title, snippet };
-    });
-
-    res.json(formatted);
+    res.json(results);
   } catch (err) {
     console.error('Error searching:', err);
     res.status(500).json({ error: 'Search failed' });

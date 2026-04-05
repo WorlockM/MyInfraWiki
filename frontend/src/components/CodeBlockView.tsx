@@ -111,12 +111,17 @@ function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) 
   const nodeRef = useRef(node);
   nodeRef.current = node;
 
-  // Track editor editable state by listening to TipTap's transaction events
+  // Track editable state via the ProseMirror contenteditable attribute,
+  // which TipTap always updates even when emitUpdate is suppressed.
   useEffect(() => {
-    const update = () => setIsEditable(editor.isEditable);
-    editor.on('transaction', update);
-    return () => editor.off('transaction', update);
-  }, [editor]);
+    const proseMirror = document.querySelector('.ProseMirror');
+    if (!proseMirror) return;
+    const observer = new MutationObserver(() => {
+      setIsEditable(proseMirror.getAttribute('contenteditable') === 'true');
+    });
+    observer.observe(proseMirror, { attributes: true, attributeFilter: ['contenteditable'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const pre = preRef.current;

@@ -36,6 +36,15 @@ db.exec(`
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS page_versions (
+    id TEXT PRIMARY KEY,
+    page_id TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    saved_at TEXT NOT NULL,
+    version_number INTEGER NOT NULL
+  );
 `);
 
 // Middleware
@@ -69,6 +78,23 @@ const upload = multer({
     }
   },
 });
+
+// Helper: save a version snapshot before overwriting page content
+function saveVersion(pageId: string, title: string, content: string) {
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  const row = db.prepare('SELECT COALESCE(MAX(version_number), 0) AS max_v FROM page_versions WHERE page_id = ?').get(pageId) as { max_v: number };
+  const versionNumber = row.max_v + 1;
+
+  db.prepare('INSERT INTO page_versions (id, page_id, title, content, saved_at, version_number) VALUES (?, ?, ?, ?, ?, ?)').run(id, pageId, title, content, now, versionNumber);
+
+  // Keep at most 50 versions per page
+  const old = db.prepare('SELECT id FROM page_versions WHERE page_id = ? ORDER BY version_number DESC LIMIT -1 OFFSET 50').all(pageId) as { id: string }[];
+  if (old.length > 0) {
+    const del = db.prepare('DELETE FROM page_versions WHERE id = ?');
+    db.transaction(() => { for (const v of old) del.run(v.id); })();
+  }
+}
 
 // Helper: get all descendant IDs for a page
 function getDescendantIds(pageId: string): string[] {
@@ -162,6 +188,11 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
     const newParentId = parent_id !== undefined ? parent_id : existing.parent_id;
     const newPosition = position !== undefined ? position : existing.position;
 
+    // Save a version snapshot when title or content actually changes
+    if ((title !== undefined && title !== existing.title) || (content !== undefined && content !== existing.content)) {
+      saveVersion(req.params.id, existing.title, existing.content);
+    }
+
     // Guard: prevent circular reference (moving a page under its own descendant)
     if (newParentId && newParentId !== existing.parent_id) {
       const descendants = getDescendantIds(req.params.id);
@@ -205,6 +236,65 @@ app.delete('/api/pages/:id', (req: Request, res: Response) => {
   } catch (err) {
     console.error('Error deleting page:', err);
     res.status(500).json({ error: 'Failed to delete page' });
+  }
+});
+
+// GET /api/pages/:id/versions - list all versions for a page
+app.get('/api/pages/:id/versions', (req: Request, res: Response) => {
+  try {
+    const page = db.prepare('SELECT id FROM pages WHERE id = ?').get(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+
+    const versions = db
+      .prepare('SELECT id, title, saved_at, version_number FROM page_versions WHERE page_id = ? ORDER BY version_number DESC')
+      .all(req.params.id);
+    res.json(versions);
+  } catch (err) {
+    console.error('Error fetching versions:', err);
+    res.status(500).json({ error: 'Failed to fetch versions' });
+  }
+});
+
+// GET /api/pages/:id/versions/:versionId - get a specific version with content
+app.get('/api/pages/:id/versions/:versionId', (req: Request, res: Response) => {
+  try {
+    const version = db
+      .prepare('SELECT * FROM page_versions WHERE id = ? AND page_id = ?')
+      .get(req.params.versionId, req.params.id);
+    if (!version) return res.status(404).json({ error: 'Version not found' });
+    res.json(version);
+  } catch (err) {
+    console.error('Error fetching version:', err);
+    res.status(500).json({ error: 'Failed to fetch version' });
+  }
+});
+
+// POST /api/pages/:id/restore/:versionId - restore a page to a previous version
+app.post('/api/pages/:id/restore/:versionId', (req: Request, res: Response) => {
+  try {
+    const existing = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id) as {
+      id: string; title: string; content: string;
+    } | undefined;
+    if (!existing) return res.status(404).json({ error: 'Page not found' });
+
+    const version = db
+      .prepare('SELECT * FROM page_versions WHERE id = ? AND page_id = ?')
+      .get(req.params.versionId, req.params.id) as {
+        id: string; title: string; content: string;
+      } | undefined;
+    if (!version) return res.status(404).json({ error: 'Version not found' });
+
+    // Save current state before overwriting
+    saveVersion(req.params.id, existing.title, existing.content);
+
+    const now = new Date().toISOString();
+    db.prepare('UPDATE pages SET title = ?, content = ?, updated_at = ? WHERE id = ?').run(version.title, version.content, now, req.params.id);
+
+    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
+    res.json(page);
+  } catch (err) {
+    console.error('Error restoring version:', err);
+    res.status(500).json({ error: 'Failed to restore version' });
   }
 });
 

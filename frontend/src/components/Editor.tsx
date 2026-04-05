@@ -22,6 +22,7 @@ import { WikiLinkExtension } from './WikiLinkExtension';
 import { TableOfContentsExtension } from './TableOfContentsExtension';
 import { PageTreeExtension } from './PageTreeExtension';
 import WikiLinkModal from './WikiLinkModal';
+import HistoryModal from './HistoryModal';
 import axios from 'axios';
 import {
   Bold,
@@ -52,6 +53,7 @@ import {
   Link as LinkIcon,
   BookOpen,
   Network,
+  History,
 } from 'lucide-react';
 
 interface EditorProps {
@@ -345,6 +347,7 @@ export default function Editor({
   const [loading, setLoading] = useState(true);
   const [wordCount, setWordCount] = useState(0);
   const [wikiLinkModalOpen, setWikiLinkModalOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [titleError, setTitleError] = useState('');
 
   const titleRef = useRef(title);
@@ -695,10 +698,16 @@ export default function Editor({
               </button>
             </>
           ) : (
-            <button className="btn-mode btn-mode--edit" onClick={handleEdit} title="Edit page">
-              <Pencil size={14} />
-              Edit
-            </button>
+            <>
+              <button className="btn-mode btn-mode--history" onClick={() => setHistoryOpen(true)} title="Page history">
+                <History size={14} />
+                History
+              </button>
+              <button className="btn-mode btn-mode--edit" onClick={handleEdit} title="Edit page">
+                <Pencil size={14} />
+                Edit
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -713,6 +722,22 @@ export default function Editor({
         <WikiLinkModal
           onClose={() => setWikiLinkModalOpen(false)}
           onSelect={handleWikiLinkSelect}
+        />
+      )}
+
+      {historyOpen && (
+        <HistoryModal
+          pageId={pageId}
+          onClose={() => setHistoryOpen(false)}
+          onRestored={() => {
+            setHistoryOpen(false);
+            onSaved();
+            axios.get<PageData>(`/api/pages/${pageId}`).then((res) => {
+              setTitle(res.data.title);
+              editor?.commands.setContent(res.data.content || '');
+              setDirty(false);
+            });
+          }}
         />
       )}
     </div>

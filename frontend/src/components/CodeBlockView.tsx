@@ -13,8 +13,13 @@ function getMermaidTheme(): 'dark' | 'default' {
   return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
 }
 
+// Initialize once globally
+mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme(), securityLevel: 'loose' });
+
+let renderCounter = 0;
+
 function MermaidDiagram({ code }: { code: string }) {
-  const idRef = useRef(`mermaid-${Math.random().toString(36).slice(2, 10)}`);
+  const idRef = useRef(`mermaid-${++renderCounter}`);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(getMermaidTheme);
@@ -29,14 +34,23 @@ function MermaidDiagram({ code }: { code: string }) {
     if (!code.trim()) return;
     setSvg('');
     setError('');
+
+    // Use a unique ID each render to avoid mermaid's internal caching issues
+    const id = `mermaid-${++renderCounter}`;
+    idRef.current = id;
+
     mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'loose' });
-    mermaid
-      .render(idRef.current, code.trim())
-      .then(({ svg: rendered }) => { setSvg(rendered); })
-      .catch((err: unknown) => {
-        setError(String(err instanceof Error ? err.message : err).split('\n')[0]);
-      })
-      .finally(() => { document.getElementById(idRef.current)?.remove(); });
+
+    // Defer to next microtask so the DOM is ready after TipTap's editable toggle
+    Promise.resolve().then(() =>
+      mermaid
+        .render(id, code.trim())
+        .then(({ svg: rendered }) => { setSvg(rendered); })
+        .catch((err: unknown) => {
+          setError(String(err instanceof Error ? err.message : err).split('\n')[0]);
+        })
+        .finally(() => { document.getElementById(id)?.remove(); })
+    );
   }, [code, theme]);
 
   if (error) return (

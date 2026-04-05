@@ -31,6 +31,7 @@ jobs:
 
       - name: Copy tag
         run: |
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           crane copy \
-            ghcr.io/${{ github.repository }}:${{ inputs.old_tag }} \
-            ghcr.io/${{ github.repository }}:${{ inputs.new_tag }}
+            ghcr.io/${REPO}:${{ inputs.old_tag }} \
+            ghcr.io/${REPO}:${{ inputs.new_tag }}

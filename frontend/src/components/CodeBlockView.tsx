@@ -1,10 +1,52 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import { createLowlight, all } from 'lowlight';
 import { Check, Copy } from 'lucide-react';
+import mermaid from 'mermaid';
 
 const lowlight = createLowlight(all);
+
+// ─── Mermaid diagram renderer ─────────────────────────────────────────────────
+
+function getMermaidTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+}
+
+function MermaidDiagram({ code }: { code: string }) {
+  const reactId = useId();
+  const id = `mermaid-${reactId.replace(/[^a-z0-9]/gi, '')}`;
+  const [svg, setSvg] = useState('');
+  const [error, setError] = useState('');
+  const [theme, setTheme] = useState(getMermaidTheme);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => setTheme(getMermaidTheme()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!code.trim()) return;
+    mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'strict' });
+    mermaid
+      .render(id, code.trim())
+      .then(({ svg: rendered }) => { setSvg(rendered); setError(''); })
+      .catch((err: unknown) => {
+        setError(String(err instanceof Error ? err.message : err).split('\n')[0]);
+        setSvg('');
+      })
+      .finally(() => { document.getElementById(id)?.remove(); });
+  }, [code, id, theme]);
+
+  if (error) return (
+    <div className="mermaid-error">
+      <strong>Diagram error:</strong> {error}
+    </div>
+  );
+  if (!svg) return null;
+  return <div className="mermaid-diagram" dangerouslySetInnerHTML={{ __html: svg }} />;
+}
 
 const LANGUAGES = [
   { value: '',           label: 'Auto' },
@@ -34,6 +76,7 @@ const LANGUAGES = [
   { value: 'kotlin',     label: 'Kotlin' },
   { value: 'markdown',   label: 'Markdown' },
   { value: 'plaintext',  label: 'Plain text' },
+  { value: 'mermaid',    label: 'Mermaid diagram' },
 ];
 
 interface CodeBlockProps {
@@ -106,6 +149,15 @@ function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) 
   }, []);
 
   const currentLang = node.attrs.language ?? '';
+
+  // In read mode, render Mermaid diagrams instead of code
+  if (currentLang === 'mermaid' && !editor.isEditable) {
+    return (
+      <NodeViewWrapper className="code-block-wrapper">
+        <MermaidDiagram code={node.textContent} />
+      </NodeViewWrapper>
+    );
+  }
 
   return (
     <NodeViewWrapper className="code-block-wrapper">

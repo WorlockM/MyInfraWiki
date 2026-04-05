@@ -1190,6 +1190,28 @@ html, body, #root {
   color: var(--color-text-secondary);
 }
 
+/* ─── Mermaid diagrams ──────────────────────────────────────────────────────── */
+.mermaid-diagram {
+  padding: 16px 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  padding: 12px 16px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  color: var(--color-danger);
+  font-size: 13px;
+  margin: 8px 0;
+}
+
 /* ─── Backlinks ─────────────────────────────────────────────────────────────── */
 .backlinks-section {
   margin: 40px 0 8px;

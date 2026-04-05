@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useId } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import { createLowlight, all } from 'lowlight';
@@ -14,8 +14,7 @@ function getMermaidTheme(): 'dark' | 'default' {
 }
 
 function MermaidDiagram({ code }: { code: string }) {
-  const reactId = useId();
-  const id = `mermaid-${reactId.replace(/[^a-z0-9]/gi, '')}`;
+  const idRef = useRef(`mermaid-${Math.random().toString(36).slice(2, 10)}`);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(getMermaidTheme);
@@ -28,16 +27,17 @@ function MermaidDiagram({ code }: { code: string }) {
 
   useEffect(() => {
     if (!code.trim()) return;
-    mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'strict' });
+    setSvg('');
+    setError('');
+    mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'loose' });
     mermaid
-      .render(id, code.trim())
-      .then(({ svg: rendered }) => { setSvg(rendered); setError(''); })
+      .render(idRef.current, code.trim())
+      .then(({ svg: rendered }) => { setSvg(rendered); })
       .catch((err: unknown) => {
         setError(String(err instanceof Error ? err.message : err).split('\n')[0]);
-        setSvg('');
       })
-      .finally(() => { document.getElementById(id)?.remove(); });
-  }, [code, id, theme]);
+      .finally(() => { document.getElementById(idRef.current)?.remove(); });
+  }, [code, theme]);
 
   if (error) return (
     <div className="mermaid-error">
@@ -88,6 +88,7 @@ interface CodeBlockProps {
 
 function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const [isEditable, setIsEditable] = useState(editor.isEditable);
   const [lineCount, setLineCount] = useState(() =>
     Math.max(1, (node.textContent ?? '').split('\n').length)
   );
@@ -95,6 +96,11 @@ function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) 
   const preRef = useRef<HTMLPreElement>(null);
   const nodeRef = useRef(node);
   nodeRef.current = node;
+
+  // Track editor editable state changes
+  useEffect(() => {
+    setIsEditable(editor.isEditable);
+  }, [editor.isEditable]);
 
   useEffect(() => {
     const pre = preRef.current;
@@ -151,7 +157,7 @@ function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) 
   const currentLang = node.attrs.language ?? '';
 
   // In read mode, render Mermaid diagrams instead of code
-  if (currentLang === 'mermaid' && !editor.isEditable) {
+  if (currentLang === 'mermaid' && !isEditable) {
     return (
       <NodeViewWrapper className="code-block-wrapper">
         <MermaidDiagram code={node.textContent} />

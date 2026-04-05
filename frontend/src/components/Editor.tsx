@@ -69,6 +69,7 @@ interface PageData {
   id: string;
   title: string;
   content: string;
+  updated_at: string;
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -355,6 +356,7 @@ export default function Editor({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [titleError, setTitleError] = useState('');
   const [backlinks, setBacklinks] = useState<BacklinkPage[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -518,6 +520,7 @@ export default function Editor({
       .then((res) => {
         if (cancelled) return;
         setTitle(res.data.title);
+        setUpdatedAt(res.data.updated_at);
         editor?.commands.setContent(res.data.content || '');
         setWordCount(editor?.storage.characterCount?.words() ?? 0);
         setLoading(false);
@@ -562,6 +565,7 @@ export default function Editor({
       });
       setSaveStatus('saved');
       setDirty(false);
+      setUpdatedAt(new Date().toISOString());
       onSaved();
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
@@ -649,17 +653,22 @@ export default function Editor({
     [editor]
   );
 
-  // Cmd+S / Ctrl+S to save
+  // Cmd+S / Ctrl+S to save — Cmd+E / Ctrl+E to edit
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's' && isEditing) {
-        e.preventDefault();
-        handleSave();
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === 's' && isEditing) {
+          e.preventDefault();
+          handleSave();
+        } else if (e.key === 'e' && !isEditing) {
+          e.preventDefault();
+          handleEdit();
+        }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isEditing, handleSave]);
+  }, [isEditing, handleSave, handleEdit]);
 
   if (loading) {
     return (
@@ -717,7 +726,7 @@ export default function Editor({
                 <History size={14} />
                 History
               </button>
-              <button className="btn-mode btn-mode--edit" onClick={handleEdit} title="Edit page">
+              <button className="btn-mode btn-mode--edit" onClick={handleEdit} title="Edit page (Ctrl+E)">
                 <Pencil size={14} />
                 Edit
               </button>
@@ -730,6 +739,15 @@ export default function Editor({
 
       <div className={`editor-content-area ${!isEditing ? 'editor-content-area--readonly' : ''}`}>
         <EditorContent editor={editor} className="tiptap-editor" />
+
+        {!isEditing && updatedAt && (
+          <div className="page-updated-at">
+            Last updated {new Date(updatedAt).toLocaleString(undefined, {
+              day: '2-digit', month: 'short', year: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+            })}
+          </div>
+        )}
 
         {!isEditing && backlinks.length > 0 && (
           <div className="backlinks-section">

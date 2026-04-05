@@ -39,6 +39,27 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// Delete uploaded files that are no longer referenced in any page content
+function cleanupOrphanedUploads() {
+  try {
+    const files = fs.readdirSync(UPLOADS_PATH);
+    if (files.length === 0) return;
+
+    const pages = db.prepare('SELECT content FROM pages').all() as { content: string }[];
+    const allContent = pages.map((p) => p.content).join(' ');
+
+    for (const file of files) {
+      if (!allContent.includes(`/uploads/${file}`)) {
+        fs.unlink(path.join(UPLOADS_PATH, file), (err) => {
+          if (err) console.error(`Failed to delete orphaned upload ${file}:`, err);
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error during upload cleanup:', err);
+  }
+}
+
 // Build a safe FTS5 MATCH expression from user input
 function buildFtsQuery(q: string): string {
   const words = q.replace(/["'*^(){}[\]|\\]/g, ' ').trim().split(/\s+/).filter(Boolean);
@@ -259,6 +280,7 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
 
     const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
     ftsUpdate(req.params.id, newTitle, newContent);
+    cleanupOrphanedUploads();
     res.json(page);
   } catch (err) {
     console.error('Error updating page:', err);
@@ -285,6 +307,7 @@ app.delete('/api/pages/:id', (req: Request, res: Response) => {
     });
     deleteMany(allIds);
     for (const id of allIds) ftsDelete(id);
+    cleanupOrphanedUploads();
 
     res.json({ success: true, deleted: allIds.length });
   } catch (err) {

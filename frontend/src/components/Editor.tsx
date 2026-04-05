@@ -73,6 +73,11 @@ interface PageData {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
+interface BacklinkPage {
+  id: string;
+  title: string;
+}
+
 interface ToolbarButtonProps {
   onClick: () => void;
   active?: boolean;
@@ -349,6 +354,7 @@ export default function Editor({
   const [wikiLinkModalOpen, setWikiLinkModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [titleError, setTitleError] = useState('');
+  const [backlinks, setBacklinks] = useState<BacklinkPage[]>([]);
 
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -528,6 +534,14 @@ export default function Editor({
       cancelled = true;
     };
   }, [pageId, editor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch backlinks whenever the page changes or is saved
+  useEffect(() => {
+    axios
+      .get<BacklinkPage[]>(`/api/pages/${pageId}/backlinks`)
+      .then((res) => setBacklinks(res.data))
+      .catch(() => setBacklinks([]));
+  }, [pageId, saveStatus]); // re-fetch after save (saveStatus goes 'saved')
 
   const save = useCallback(async () => {
     if (!editor) return;
@@ -716,6 +730,21 @@ export default function Editor({
 
       <div className={`editor-content-area ${!isEditing ? 'editor-content-area--readonly' : ''}`}>
         <EditorContent editor={editor} className="tiptap-editor" />
+
+        {!isEditing && backlinks.length > 0 && (
+          <div className="backlinks-section">
+            <div className="backlinks-header">Linked from</div>
+            <ul className="backlinks-list">
+              {backlinks.map((bl) => (
+                <li key={bl.id}>
+                  <button className="backlink-item" onClick={() => onNavigate?.(bl.id)}>
+                    {bl.title || 'Untitled'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {wikiLinkModalOpen && (

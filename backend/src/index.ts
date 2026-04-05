@@ -300,6 +300,22 @@ app.post('/api/pages/:id/restore/:versionId', (req: Request, res: Response) => {
   }
 });
 
+// GET /api/pages/:id/backlinks - pages that link to this page
+app.get('/api/pages/:id/backlinks', (req: Request, res: Response) => {
+  try {
+    const page = db.prepare('SELECT id FROM pages WHERE id = ?').get(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+
+    const backlinks = db
+      .prepare(`SELECT id, title FROM pages WHERE content LIKE ? AND id != ?`)
+      .all(`%data-page-id="${req.params.id}"%`, req.params.id);
+    res.json(backlinks);
+  } catch (err) {
+    console.error('Error fetching backlinks:', err);
+    res.status(500).json({ error: 'Failed to fetch backlinks' });
+  }
+});
+
 // GET /api/search?q=query - full text search
 app.get('/api/search', (req: Request, res: Response) => {
   try {

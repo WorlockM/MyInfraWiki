@@ -95,6 +95,44 @@ db.exec(`
   );
 `);
 
+// Seed demo content if the database is empty
+{
+  const count = (db.prepare('SELECT COUNT(*) as c FROM pages').get() as { c: number }).c;
+  if (count === 0) {
+    const now = new Date().toISOString();
+    const id1 = uuidv4();
+    const id2 = uuidv4();
+    const id3 = uuidv4();
+
+    db.prepare('INSERT INTO pages (id, title, content, parent_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      id1,
+      'Welcome to MyInfraWiki',
+      `<h2>What is MyInfraWiki?</h2><p>MyInfraWiki is a self-hosted wiki for documenting your infrastructure. Write pages using the rich-text editor, organise them in a hierarchy, and find anything instantly with full-text search.</p><h2>Getting started</h2><ul><li><p>Click <strong>Edit</strong> (or press <kbd>Ctrl+E</kbd> / <kbd>Cmd+E</kbd>) to start editing any page.</p></li><li><p>Use the <strong>+</strong> button in the sidebar to create a new page.</p></li><li><p>Drag pages in the sidebar to reorganise them.</p></li><li><p>Use the search bar at the top of the sidebar to find pages.</p></li></ul><h2>Features</h2><ul><li><p>Rich-text editor with headings, lists, tables, code blocks and more</p></li><li><p>Syntax highlighting for 190+ languages</p></li><li><p>Mermaid diagrams inside code blocks</p></li><li><p>Page history with word-level diff and version restore</p></li><li><p>Backlinks — see which pages link to this one</p></li><li><p>Dark mode, defaulting to your system preference</p></li><li><p>PDF export</p></li></ul>`,
+      null, 0, now, now
+    );
+
+    db.prepare('INSERT INTO pages (id, title, content, parent_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      id2,
+      'Markdown & Formatting',
+      `<h2>Text formatting</h2><p>The toolbar gives you access to <strong>bold</strong>, <em>italic</em>, <u>underline</u>, and <mark>highlight</mark>. You can also use keyboard shortcuts like <kbd>Ctrl+B</kbd> for bold.</p><h2>Code blocks</h2><p>Insert a code block and select the language from the dropdown in the header. Line numbers and a copy button are included automatically.</p><pre><code class="language-bash">docker compose up -d</code></pre><h2>Mermaid diagrams</h2><p>Set the language to <strong>Mermaid diagram</strong> to render diagrams:</p><pre><code class="language-mermaid">flowchart LR
+    A[Browser] --> B[MyInfraWiki]
+    B --> C[(SQLite)]</code></pre><h2>Callouts</h2><div data-type="callout" data-callout-type="info"><p>This is an info callout. Use it to highlight important information.</p></div><div data-type="callout" data-callout-type="warning"><p>This is a warning callout.</p></div><div data-type="callout" data-callout-type="error"><p>This is an error callout.</p></div>`,
+      id1, 0, now, now
+    );
+
+    db.prepare('INSERT INTO pages (id, title, content, parent_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      id3,
+      'Example: Server Documentation',
+      `<h2>Server overview</h2><table><tbody><tr><th>Property</th><th>Value</th></tr><tr><td>Hostname</td><td>srv-prod-01</td></tr><tr><td>IP address</td><td>10.0.1.10</td></tr><tr><td>OS</td><td>Ubuntu 24.04 LTS</td></tr><tr><td>Role</td><td>Application server</td></tr><tr><td>CPU</td><td>4 vCPU</td></tr><tr><td>RAM</td><td>8 GB</td></tr></tbody></table><h2>Installed services</h2><ul><li><p>Docker 26.x</p></li><li><p>Nginx (reverse proxy)</p></li><li><p>Node Exporter (Prometheus metrics)</p></li></ul><h2>Network diagram</h2><pre><code class="language-mermaid">flowchart TD
+    Internet --> FW{Firewall}
+    FW -->|443| LB[Nginx]
+    LB --> App[srv-prod-01]
+    App --> DB[(PostgreSQL)]</code></pre><h2>Maintenance notes</h2><div data-type="callout" data-callout-type="warning"><p>Always create a snapshot before performing OS upgrades.</p></div>`,
+      id1, 1, now, now
+    );
+  }
+}
+
 // Rebuild the FTS index from the pages table on every startup
 {
   const ftsInsert = db.prepare('INSERT INTO pages_fts(page_id, title, body) VALUES (?, ?, ?)');

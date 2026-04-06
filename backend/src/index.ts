@@ -114,7 +114,18 @@ db.exec(`
     db.prepare('INSERT INTO pages (id, title, content, parent_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
       id2,
       'Markdown & Formatting',
-      `<h2>Text formatting</h2><p>The toolbar gives you access to <strong>bold</strong>, <em>italic</em>, <u>underline</u>, and <mark>highlight</mark>. You can also use keyboard shortcuts like <kbd>Ctrl+B</kbd> for bold.</p><h2>Code blocks</h2><p>Insert a code block and select the language from the dropdown in the header. Line numbers and a copy button are included automatically.</p><pre><code class="language-bash">docker compose up -d</code></pre><h2>Mermaid diagrams</h2><p>Set the language to <strong>Mermaid diagram</strong> to render diagrams:</p><pre><code class="language-mermaid">flowchart LR
+      `<h2>Text formatting</h2><p>The toolbar gives you access to <strong>bold</strong>, <em>italic</em>, <u>underline</u>, and <mark>highlight</mark>. You can also use keyboard shortcuts like <kbd>Ctrl+B</kbd> for bold.</p><h2>Code blocks</h2><p>Insert a code block and select the language from the dropdown in the header. Line numbers and a copy button are included automatically.</p><pre><code class="language-bash"># Pull the latest image and restart the container
+export IMAGE="ghcr.io/worlockm/myinfrawiki:latest"
+
+docker pull "$IMAGE"
+docker compose up -d --force-recreate</code></pre><p>Or with Python:</p><pre><code class="language-python">import requests
+
+# Fetch all pages from the API
+response = requests.get("http://localhost:3000/api/pages")
+pages = response.json()
+
+for page in pages:
+    print(f"{page['title']} — last updated: {page['updated_at']}")</code></pre><h2>Mermaid diagrams</h2><p>Set the language to <strong>Mermaid diagram</strong> to render diagrams:</p><pre><code class="language-mermaid">flowchart LR
     A[Browser] --> B[MyInfraWiki]
     B --> C[(SQLite)]</code></pre><h2>Callouts</h2><div data-type="callout" data-callout-type="info"><p>This is an info callout. Use it to highlight important information.</p></div><div data-type="callout" data-callout-type="warning"><p>This is a warning callout.</p></div><div data-type="callout" data-callout-type="error"><p>This is an error callout.</p></div>`,
       id1, 0, now, now

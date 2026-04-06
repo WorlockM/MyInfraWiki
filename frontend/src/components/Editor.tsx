@@ -658,8 +658,12 @@ export default function Editor({
   );
 
   const handlePdf = useCallback(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const html2pdf = ((await import('html2pdf.js')) as any).default;
+    const html2pdf = ((await import('html2pdf.js')) as any).default; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    // Temporarily force light mode so PDF always has dark text on white background
+    const root = document.documentElement;
+    const prevTheme = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', 'light');
     const content = document.querySelector('.editor-content-area');
     if (!content) return;
 
@@ -676,7 +680,7 @@ export default function Editor({
     contentClone.querySelectorAll('.page-updated-at, .backlinks-section').forEach(el => el.remove());
     wrapper.appendChild(contentClone);
 
-    html2pdf()
+    await html2pdf()
       .set({
         margin: 15,
         filename: `${titleRef.current || 'page'}.pdf`,
@@ -686,6 +690,13 @@ export default function Editor({
       })
       .from(wrapper)
       .save();
+
+    // Restore original theme
+    if (prevTheme) {
+      root.setAttribute('data-theme', prevTheme);
+    } else {
+      root.removeAttribute('data-theme');
+    }
   }, []);
 
   // Cmd+S / Ctrl+S to save — Cmd+E / Ctrl+E to edit

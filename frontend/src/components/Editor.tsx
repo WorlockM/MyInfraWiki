@@ -57,6 +57,9 @@ import {
   FileDown,
 } from 'lucide-react';
 
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+const mod = isMac ? 'Cmd' : 'Ctrl';
+
 interface EditorProps {
   pageId: string;
   onSaved: () => void;
@@ -716,7 +719,7 @@ export default function Editor({
                 <X size={14} />
                 Cancel
               </button>
-              <button className="btn-mode btn-mode--save" onClick={handleSave} title="Save (Cmd+S)">
+              <button className="btn-mode btn-mode--save" onClick={handleSave} title={`Save (${mod}+S)`}>
                 <Save size={14} />
                 Save
               </button>
@@ -731,7 +734,7 @@ export default function Editor({
                 <FileDown size={14} />
                 PDF
               </button>
-              <button className="btn-mode btn-mode--edit" onClick={handleEdit} title="Edit page (Ctrl+E)">
+              <button className="btn-mode btn-mode--edit" onClick={handleEdit} title={`Edit page (${mod}+E)`}>
                 <Pencil size={14} />
                 Edit
               </button>

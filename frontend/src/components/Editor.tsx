@@ -665,7 +665,8 @@ export default function Editor({
 
     // Cover the page so the user doesn't see the theme switch
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:var(--color-bg);';
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    overlay.style.cssText = `position:fixed;inset:0;z-index:99999;background:${isDark ? '#1a1a1e' : '#ffffff'};`;
     document.body.appendChild(overlay);
 
     // Switch to light mode so html2canvas captures light computed styles

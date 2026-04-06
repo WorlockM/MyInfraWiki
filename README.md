@@ -12,7 +12,7 @@
 
 - **Rich text editor** – formatting, headings, lists, tables, blockquotes, task lists and more
 - **Code blocks** – syntax highlighting for 190+ languages, line numbers, copy button and language selector
-- **Callout blocks** – info, warning and error styles, similar to Confluence
+- **Callout blocks** – info, warning and error styles
 - **Hierarchical pages** – nest pages under other pages via drag-and-drop
 - **Internal page links** – link directly to other wiki pages
 - **Table of Contents** – automatically generated from headings
@@ -27,8 +27,6 @@
 - **Backlinks** – see which pages link to the current page
 - **Mermaid diagrams** – render flowcharts, sequence diagrams, pie charts and more inside code blocks
 - **Last updated date** – shown on every page in read mode
-- **Keyboard shortcut** – Ctrl+E / Cmd+E to toggle edit mode
-- **Orphaned upload cleanup** – images removed from a page are automatically deleted from storage
 
 ---
 

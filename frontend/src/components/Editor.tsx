@@ -660,25 +660,28 @@ export default function Editor({
   const handlePdf = useCallback(async () => {
     const html2pdf = ((await import('html2pdf.js')) as any).default; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    // Temporarily force light mode so PDF always has dark text on white background
-    const root = document.documentElement;
-    const prevTheme = root.getAttribute('data-theme');
-    root.setAttribute('data-theme', 'light');
     const content = document.querySelector('.editor-content-area');
     if (!content) return;
 
+    // Render into an off-screen light-theme container — never touches the visible page
+    const offscreen = document.createElement('div');
+    offscreen.setAttribute('data-theme', 'light');
+    offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;background:#fff;';
+
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'font-family: sans-serif; color: #000; padding: 0;';
+    wrapper.style.cssText = 'font-family:sans-serif;color:#000;padding:0;';
 
     const titleEl = document.createElement('h1');
     titleEl.textContent = titleRef.current || 'Untitled';
-    titleEl.style.cssText = 'font-size: 24pt; margin: 0 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid #ccc;';
+    titleEl.style.cssText = 'font-size:24pt;margin:0 0 16px 0;padding-bottom:8px;border-bottom:1px solid #ccc;';
     wrapper.appendChild(titleEl);
 
     const contentClone = content.cloneNode(true) as HTMLElement;
-    // Remove elements that shouldn't appear in the PDF
     contentClone.querySelectorAll('.page-updated-at, .backlinks-section').forEach(el => el.remove());
     wrapper.appendChild(contentClone);
+
+    offscreen.appendChild(wrapper);
+    document.body.appendChild(offscreen);
 
     await html2pdf()
       .set({
@@ -691,12 +694,7 @@ export default function Editor({
       .from(wrapper)
       .save();
 
-    // Restore original theme
-    if (prevTheme) {
-      root.setAttribute('data-theme', prevTheme);
-    } else {
-      root.removeAttribute('data-theme');
-    }
+    document.body.removeChild(offscreen);
   }, []);
 
   // Cmd+S / Ctrl+S to save — Cmd+E / Ctrl+E to edit

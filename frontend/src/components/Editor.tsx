@@ -663,10 +663,18 @@ export default function Editor({
     const content = document.querySelector('.editor-content-area');
     if (!content) return;
 
-    // Render into an off-screen light-theme container — never touches the visible page
+    // Render into an off-screen container with explicit light-theme variables —
+    // setting data-theme on a div doesn't override :root variables, so we inline them.
     const offscreen = document.createElement('div');
-    offscreen.setAttribute('data-theme', 'light');
-    offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;background:#fff;';
+    offscreen.style.cssText = [
+      'position:absolute;left:-9999px;top:0;width:210mm;background:#fff;',
+      '--color-bg:#ffffff;--color-bg-secondary:#f7f7f8;--color-bg-hover:#f0f0f1;--color-bg-active:#e8e8ea;',
+      '--color-sidebar:#fafafa;--color-sidebar-border:#e5e5e5;',
+      '--color-text:#1a1a1a;--color-text-secondary:#6b7280;--color-text-muted:#9ca3af;',
+      '--color-border:#e5e7eb;--color-primary:#3b82f6;--color-primary-hover:#2563eb;',
+      '--color-primary-light:#eff6ff;--color-code-bg:#f3f4f6;',
+      '--color-danger:#ef4444;--color-success:#10b981;--color-warning:#f59e0b;',
+    ].join('');
 
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'font-family:sans-serif;color:#000;padding:0;';

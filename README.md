@@ -45,11 +45,6 @@ services:
     volumes:
       - wiki-data:/data
     restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - DATABASE_PATH=/data/wiki.db
-      - UPLOADS_PATH=/data/uploads
-      - PORT=3000
 
 volumes:
   wiki-data:
@@ -73,16 +68,14 @@ docker run -d \
   -p 3000:3000 \
   -v wiki-data:/data \
   --restart unless-stopped \
-  -e NODE_ENV=production \
-  -e DATABASE_PATH=/data/wiki.db \
-  -e UPLOADS_PATH=/data/uploads \
-  -e PORT=3000 \
   ghcr.io/worlockm/myinfrawiki:latest
 ```
 
 ---
 
 ## Environment variables
+
+All variables are optional. The defaults work out of the box with the example compose files above.
 
 | Variable        | Default           | Description                              |
 |-----------------|-------------------|------------------------------------------|

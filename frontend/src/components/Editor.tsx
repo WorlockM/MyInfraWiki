@@ -657,6 +657,37 @@ export default function Editor({
     [editor]
   );
 
+  const handlePdf = useCallback(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const html2pdf = ((await import('html2pdf.js')) as any).default;
+    const content = document.querySelector('.editor-content-area');
+    if (!content) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'font-family: sans-serif; color: #000; padding: 0;';
+
+    const titleEl = document.createElement('h1');
+    titleEl.textContent = titleRef.current || 'Untitled';
+    titleEl.style.cssText = 'font-size: 24pt; margin: 0 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid #ccc;';
+    wrapper.appendChild(titleEl);
+
+    const contentClone = content.cloneNode(true) as HTMLElement;
+    // Remove elements that shouldn't appear in the PDF
+    contentClone.querySelectorAll('.page-updated-at, .backlinks-section').forEach(el => el.remove());
+    wrapper.appendChild(contentClone);
+
+    html2pdf()
+      .set({
+        margin: 15,
+        filename: `${titleRef.current || 'page'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      })
+      .from(wrapper)
+      .save();
+  }, []);
+
   // Cmd+S / Ctrl+S to save — Cmd+E / Ctrl+E to edit
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -730,7 +761,7 @@ export default function Editor({
                 <History size={14} />
                 History
               </button>
-              <button className="btn-mode btn-mode--pdf" onClick={() => window.print()} title="Export as PDF">
+              <button className="btn-mode btn-mode--pdf" onClick={handlePdf} title="Export as PDF">
                 <FileDown size={14} />
                 PDF
               </button>

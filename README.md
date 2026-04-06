@@ -20,8 +20,15 @@
 - **Images** – upload via drag-and-drop or paste from clipboard
 - **Automatic URL detection** – pasted links are automatically made clickable
 - **Unsaved changes warning** – confirmation dialog when navigating away with unsaved changes
-- **Dark mode** – fully supported
+- **Dark mode** – fully supported, defaults to system preference
 - **Mobile-friendly** – responsive layout with slide-in sidebar, touch-optimised toolbar and scrollable tables
+- **Full-text search** – fast SQLite FTS5 search across all page titles and content
+- **Page history** – every save creates a version snapshot; restore any previous version with a word-level diff view
+- **Backlinks** – see which pages link to the current page
+- **Mermaid diagrams** – render flowcharts, sequence diagrams, pie charts and more inside code blocks
+- **Last updated date** – shown on every page in read mode
+- **Keyboard shortcut** – Ctrl+E / Cmd+E to toggle edit mode
+- **Orphaned upload cleanup** – images removed from a page are automatically deleted from storage
 
 ---
 

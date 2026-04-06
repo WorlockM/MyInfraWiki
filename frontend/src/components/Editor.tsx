@@ -658,26 +658,30 @@ export default function Editor({
   );
 
   const handlePdf = useCallback(async () => {
+    const isFirefox = navigator.userAgent.includes('Firefox');
+
+    if (!isFirefox) {
+      window.print();
+      return;
+    }
+
+    // Firefox doesn't support "Save as PDF" in the print dialog, so use html2pdf.js
     const html2pdf = ((await import('html2pdf.js')) as any).default; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     const content = document.querySelector('.editor-content-area');
     if (!content) return;
 
-    // Cover the page so the user doesn't see the theme switch
     const overlay = document.createElement('div');
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     overlay.style.cssText = `position:fixed;inset:0;z-index:99999;background:${isDark ? '#1a1a1e' : '#ffffff'};`;
     document.body.appendChild(overlay);
 
-    // Wait for overlay to actually paint before switching theme
     await new Promise(r => requestAnimationFrame(r));
 
-    // Switch to light mode so html2canvas captures light computed styles
     const root = document.documentElement;
     const prevTheme = root.getAttribute('data-theme');
     root.setAttribute('data-theme', 'light');
 
-    // Wait for light styles to be applied
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const wrapper = document.createElement('div');
@@ -707,7 +711,6 @@ export default function Editor({
 
     document.body.removeChild(wrapper);
 
-    // Restore theme and remove overlay
     if (prevTheme) root.setAttribute('data-theme', prevTheme);
     else root.removeAttribute('data-theme');
     document.body.removeChild(overlay);

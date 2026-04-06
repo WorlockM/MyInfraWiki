@@ -663,18 +663,18 @@ export default function Editor({
     const content = document.querySelector('.editor-content-area');
     if (!content) return;
 
-    // Render into an off-screen container with explicit light-theme variables —
-    // setting data-theme on a div doesn't override :root variables, so we inline them.
-    const offscreen = document.createElement('div');
-    offscreen.style.cssText = [
-      'position:absolute;left:-9999px;top:0;width:210mm;background:#fff;',
-      '--color-bg:#ffffff;--color-bg-secondary:#f7f7f8;--color-bg-hover:#f0f0f1;--color-bg-active:#e8e8ea;',
-      '--color-sidebar:#fafafa;--color-sidebar-border:#e5e5e5;',
-      '--color-text:#1a1a1a;--color-text-secondary:#6b7280;--color-text-muted:#9ca3af;',
-      '--color-border:#e5e7eb;--color-primary:#3b82f6;--color-primary-hover:#2563eb;',
-      '--color-primary-light:#eff6ff;--color-code-bg:#f3f4f6;',
-      '--color-danger:#ef4444;--color-success:#10b981;--color-warning:#f59e0b;',
-    ].join('');
+    // Cover the page so the user doesn't see the theme switch
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:var(--color-bg);';
+    document.body.appendChild(overlay);
+
+    // Switch to light mode so html2canvas captures light computed styles
+    const root = document.documentElement;
+    const prevTheme = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', 'light');
+
+    // Let the browser repaint with light styles before capturing
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'font-family:sans-serif;color:#000;padding:0;';
@@ -688,8 +688,7 @@ export default function Editor({
     contentClone.querySelectorAll('.page-updated-at, .backlinks-section').forEach(el => el.remove());
     wrapper.appendChild(contentClone);
 
-    offscreen.appendChild(wrapper);
-    document.body.appendChild(offscreen);
+    document.body.appendChild(wrapper);
 
     await html2pdf()
       .set({
@@ -702,7 +701,12 @@ export default function Editor({
       .from(wrapper)
       .save();
 
-    document.body.removeChild(offscreen);
+    document.body.removeChild(wrapper);
+
+    // Restore theme and remove overlay
+    if (prevTheme) root.setAttribute('data-theme', prevTheme);
+    else root.removeAttribute('data-theme');
+    document.body.removeChild(overlay);
   }, []);
 
   // Cmd+S / Ctrl+S to save — Cmd+E / Ctrl+E to edit

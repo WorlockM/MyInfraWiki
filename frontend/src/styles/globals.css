@@ -591,6 +591,17 @@ html, body, #root {
   color: var(--color-text);
 }
 
+.btn-mode--pdf {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.btn-mode--pdf:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
 /* ─── Toolbar ───────────────────────────────────────────────────────────────── */
 .editor-toolbar {
   display: flex;
@@ -1766,6 +1777,102 @@ html, body, #root {
   .toc-node,
   .page-tree-node {
     margin: 0.5em 0;
+  }
+}
+
+@media print {
+  /* Hide everything except the page content */
+  .sidebar,
+  .mobile-header,
+  .sidebar-overlay,
+  .editor-toolbar,
+  .editor-meta,
+  .page-updated-at,
+  .backlinks-section,
+  .word-count {
+    display: none !important;
+  }
+
+  /* Full width, no chrome */
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .app-layout,
+  .main-content,
+  .editor-container {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .editor-header {
+    padding: 0 0 12px 0 !important;
+    border-bottom: 1px solid #ccc !important;
+    margin-bottom: 16px !important;
+    box-shadow: none !important;
+  }
+
+  .editor-title-view {
+    font-size: 24pt !important;
+    color: #000 !important;
+  }
+
+  .editor-content-area {
+    padding: 0 !important;
+  }
+
+  .tiptap-editor .ProseMirror {
+    padding: 0 !important;
+    max-width: 100% !important;
+    color: #000 !important;
+  }
+
+  /* Keep code blocks readable */
+  .code-block-wrapper pre {
+    border: 1px solid #ccc !important;
+    background: #f5f5f5 !important;
+    color: #000 !important;
+    page-break-inside: avoid;
+  }
+
+  .code-block-header {
+    background: #eee !important;
+    color: #000 !important;
+  }
+
+  .code-copy-btn {
+    display: none !important;
+  }
+
+  /* Avoid breaking headings from their content */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    color: #000 !important;
+  }
+
+  /* Callouts */
+  .callout {
+    border: 1px solid #ccc !important;
+    background: #f9f9f9 !important;
+    color: #000 !important;
+    page-break-inside: avoid;
+  }
+
+  /* Tables */
+  table {
+    border-collapse: collapse !important;
+  }
+
+  td, th {
+    border: 1px solid #ccc !important;
+    color: #000 !important;
   }
 }
 

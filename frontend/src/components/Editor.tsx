@@ -54,6 +54,7 @@ import {
   BookOpen,
   Network,
   History,
+  FileDown,
 } from 'lucide-react';
 
 interface EditorProps {
@@ -725,6 +726,10 @@ export default function Editor({
               <button className="btn-mode btn-mode--history" onClick={() => setHistoryOpen(true)} title="Page history">
                 <History size={14} />
                 History
+              </button>
+              <button className="btn-mode btn-mode--pdf" onClick={() => window.print()} title="Export as PDF">
+                <FileDown size={14} />
+                PDF
               </button>
               <button className="btn-mode btn-mode--edit" onClick={handleEdit} title="Edit page (Ctrl+E)">
                 <Pencil size={14} />

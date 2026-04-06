@@ -28,6 +28,15 @@
 - **Mermaid diagrams** – render flowcharts, sequence diagrams, pie charts and more inside code blocks
 - **Last updated date** – shown on every page in read mode
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshot-formatting.png" alt="Markdown & Formatting" width="720">
+</p>
+<p align="center">
+  <img src="docs/screenshot-server-docs.png" alt="Example: Server Documentation" width="720">
+</p>
+
 ---
 
 ## Getting started

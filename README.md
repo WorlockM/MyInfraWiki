@@ -31,10 +31,16 @@
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshot-formatting.png" alt="Markdown & Formatting" width="720">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-formatting-dark.png">
+    <img src="docs/screenshot-formatting-light.png" alt="Markdown & Formatting" width="720">
+  </picture>
 </p>
 <p align="center">
-  <img src="docs/screenshot-server-docs.png" alt="Example: Server Documentation" width="720">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-server-docs-dark.png">
+    <img src="docs/screenshot-server-docs-light.png" alt="Example: Server Documentation" width="720">
+  </picture>
 </p>
 
 ---

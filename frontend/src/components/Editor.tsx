@@ -669,12 +669,15 @@ export default function Editor({
     overlay.style.cssText = `position:fixed;inset:0;z-index:99999;background:${isDark ? '#1a1a1e' : '#ffffff'};`;
     document.body.appendChild(overlay);
 
+    // Wait for overlay to actually paint before switching theme
+    await new Promise(r => requestAnimationFrame(r));
+
     // Switch to light mode so html2canvas captures light computed styles
     const root = document.documentElement;
     const prevTheme = root.getAttribute('data-theme');
     root.setAttribute('data-theme', 'light');
 
-    // Let the browser repaint with light styles before capturing
+    // Wait for light styles to be applied
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const wrapper = document.createElement('div');

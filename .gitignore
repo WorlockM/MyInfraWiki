@@ -7,3 +7,4 @@ uploads/
 .env
 .DS_Store
 frontend/dist/
+.claude/

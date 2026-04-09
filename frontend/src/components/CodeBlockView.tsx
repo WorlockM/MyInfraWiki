@@ -187,8 +187,8 @@ function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) 
 
   return (
     <NodeViewWrapper className="code-block-wrapper">
-      <div className="code-block-header" contentEditable={false}>
-        {editor.isEditable ? (
+      {isEditable && (
+        <div className="code-block-header" contentEditable={false}>
           <select
             className="code-block-lang-select"
             value={currentLang}
@@ -200,19 +200,18 @@ function CodeBlockComponent({ node, updateAttributes, editor }: CodeBlockProps) 
               </option>
             ))}
           </select>
-        ) : (
-          currentLang && <span className="code-block-lang">{currentLang}</span>
-        )}
-        <button
-          ref={buttonRef}
-          className={`code-copy-btn ${copied ? 'code-copy-btn--copied' : ''}`}
-          title="Copy code"
-          aria-label="Copy code"
-        >
-          {copied ? <Check size={13} /> : <Copy size={13} />}
-          {copied ? 'Copied!' : 'Copy'}
-        </button>
-      </div>
+        </div>
+      )}
+      <button
+        ref={buttonRef}
+        className={`code-copy-btn ${copied ? 'code-copy-btn--copied' : ''}`}
+        title="Copy code"
+        aria-label="Copy code"
+        contentEditable={false}
+      >
+        {copied ? <Check size={13} /> : <Copy size={13} />}
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
       <pre ref={preRef}>
         <code className="code-line-numbers" contentEditable={false}>
           {Array.from({ length: lineCount }, (_, i) => (

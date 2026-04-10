@@ -297,10 +297,17 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
       content: string;
       parent_id: string | null;
       position: number;
+      updated_at: string;
     } | undefined;
 
     if (!existing) {
       return res.status(404).json({ error: 'Page not found' });
+    }
+
+    // Detect concurrent edit conflict
+    const { last_known_updated_at } = req.body;
+    if (last_known_updated_at !== undefined && existing.updated_at !== last_known_updated_at) {
+      return res.status(409).json({ error: 'conflict', server_updated_at: existing.updated_at });
     }
 
     const newTitle = title !== undefined ? title : existing.title;
@@ -499,10 +506,17 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`MyInfraWiki backend running on port ${PORT} (${NODE_ENV})`);
   console.log(`Database: ${DB_PATH}`);
   console.log(`Uploads: ${UPLOADS_PATH}`);
+});
+
+process.on('SIGTERM', () => {
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
 });
 
 export default app;

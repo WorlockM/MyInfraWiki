@@ -361,8 +361,10 @@ export default function Editor({
   const [titleError, setTitleError] = useState('');
   const [backlinks, setBacklinks] = useState<BacklinkPage[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [conflictDetected, setConflictDetected] = useState(false);
 
   const titleRef = useRef(title);
+  const updatedAtRef = useRef<string | null>(null);
   titleRef.current = title;
 
   const isDirtyRef = useRef(false);
@@ -525,6 +527,8 @@ export default function Editor({
         if (cancelled) return;
         setTitle(res.data.title);
         setUpdatedAt(res.data.updated_at);
+        updatedAtRef.current = res.data.updated_at;
+        setConflictDetected(false);
         editor?.commands.setContent(res.data.content || '');
         setWordCount(editor?.storage.characterCount?.words() ?? 0);
         setLoading(false);
@@ -550,31 +554,44 @@ export default function Editor({
       .catch(() => setBacklinks([]));
   }, [pageId, saveStatus]); // re-fetch after save (saveStatus goes 'saved')
 
-  const save = useCallback(async () => {
-    if (!editor) return;
+  const save = useCallback(async (force = false): Promise<'success' | 'conflict' | 'error'> => {
+    if (!editor) return 'error';
 
     const currentTitle = titleRef.current.trim();
     if (!currentTitle) {
       setTitleError('Page title cannot be empty');
       titleInputRef.current?.focus();
-      return;
+      return 'error';
     }
 
     setTitleError('');
     setSaveStatus('saving');
     try {
-      await axios.put(`/api/pages/${pageId}`, {
+      const body: Record<string, unknown> = {
         title: currentTitle,
         content: editor.getHTML(),
-      });
+      };
+      if (!force && updatedAtRef.current !== null) {
+        body.last_known_updated_at = updatedAtRef.current;
+      }
+      const res = await axios.put<PageData>(`/api/pages/${pageId}`, body);
+      const serverUpdatedAt = res.data.updated_at;
+      setUpdatedAt(serverUpdatedAt);
+      updatedAtRef.current = serverUpdatedAt;
       setSaveStatus('saved');
       setDirty(false);
-      setUpdatedAt(new Date().toISOString());
       onSaved();
       setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (err) {
+      return 'success';
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        setSaveStatus('idle');
+        setConflictDetected(true);
+        return 'conflict';
+      }
       console.error('Failed to save page:', err);
       setSaveStatus('error');
+      return 'error';
     }
   }, [editor, pageId, onSaved, setDirty]);
 
@@ -585,8 +602,10 @@ export default function Editor({
       titleInputRef.current?.focus();
       return;
     }
-    await save();
-    setIsEditing(false);
+    const result = await save();
+    if (result === 'success') {
+      setIsEditing(false);
+    }
   }, [save]);
 
   const handleEdit = () => {
@@ -800,6 +819,39 @@ export default function Editor({
       </div>
 
       {isEditing && editor && <Toolbar editor={editor} onWikiLink={() => setWikiLinkModalOpen(true)} />}
+
+      {conflictDetected && (
+        <div className="conflict-banner">
+          <span>This page was modified elsewhere since you started editing.</span>
+          <button
+            onClick={async () => {
+              setConflictDetected(false);
+              const result = await save(true);
+              if (result === 'success') setIsEditing(false);
+            }}
+          >
+            Overwrite
+          </button>
+          <button
+            onClick={() => {
+              setConflictDetected(false);
+              setLoading(true);
+              axios.get<PageData>(`/api/pages/${pageId}`).then((res) => {
+                setTitle(res.data.title);
+                setUpdatedAt(res.data.updated_at);
+                updatedAtRef.current = res.data.updated_at;
+                editor?.commands.setContent(res.data.content || '');
+                setWordCount(editor?.storage.characterCount?.words() ?? 0);
+                setDirty(false);
+                setIsEditing(false);
+                setLoading(false);
+              }).catch(() => setLoading(false));
+            }}
+          >
+            Discard &amp; reload
+          </button>
+        </div>
+      )}
 
       <div className={`editor-content-area ${!isEditing ? 'editor-content-area--readonly' : ''}`}>
         <EditorContent editor={editor} className="tiptap-editor" />

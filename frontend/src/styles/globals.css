@@ -1884,6 +1884,40 @@ html, body, #root {
   }
 }
 
+.conflict-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(245, 158, 11, 0.1);
+  border-bottom: 1px solid #f59e0b;
+  color: #92600a;
+  font-size: 0.85rem;
+}
+
+[data-theme="dark"] .conflict-banner {
+  color: #fcd34d;
+}
+
+.conflict-banner span {
+  flex: 1;
+}
+
+.conflict-banner button {
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.conflict-banner button:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
 @media (min-width: 768px) {
   .mobile-header {
     display: none;

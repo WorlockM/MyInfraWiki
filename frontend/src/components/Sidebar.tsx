@@ -318,7 +318,7 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
             onReorderPages={onReorderPages}
             onReparentPage={onReparentPage}
             isDescendant={isDescendant}
-            sortable={!sortAlpha}
+            sortable={true}
           />
         )}
       </nav>

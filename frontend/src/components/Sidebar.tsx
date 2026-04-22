@@ -11,11 +11,6 @@ import {
   ArrowUpAZ,
 } from 'lucide-react';
 
-function sortAlphabetically(nodes: PageTreeNode[]): PageTreeNode[] {
-  return [...nodes]
-    .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }))
-    .map(n => ({ ...n, children: sortAlphabetically(n.children) }));
-}
 
 interface SidebarProps {
   pages: PageTreeNode[];
@@ -294,11 +289,18 @@ function PageItem({
 }
 
 export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage }: SidebarProps) {
-  const [sortAlpha, setSortAlpha] = useState(false);
+  const handleSortAlphabetically = () => {
+    const collectGroups = (nodes: PageTreeNode[], parentId: string | null) => {
+      const sorted = [...nodes].sort((a, b) =>
+        (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' })
+      );
+      onReorderPages(parentId, sorted.map(n => n.id));
+      nodes.forEach(n => collectGroups(n.children, n.id));
+    };
+    collectGroups(pages, null);
+  };
 
-  const toggleSort = () => setSortAlpha(prev => !prev);
-
-  const displayedPages = sortAlpha ? sortAlphabetically(pages) : pages;
+  const displayedPages = pages;
   const descendantMap = buildDescendantMap(pages);
 
   const isDescendant = (ancestorId: string, targetId: string): boolean => {
@@ -314,9 +316,9 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
         </button>
         <button
           className="btn-icon btn-icon--active"
-          onClick={toggleSort}
-          title={sortAlpha ? 'Alphabetical order (click to switch to manual)' : 'Manual order (click to sort alphabetically)'}
-          aria-label="Toggle alphabetical sort"
+          onClick={handleSortAlphabetically}
+          title="Sort pages alphabetically"
+          aria-label="Sort pages alphabetically"
         >
           <ArrowUpAZ size={15} />
         </button>
@@ -337,7 +339,7 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
             onReorderPages={onReorderPages}
             onReparentPage={onReparentPage}
             isDescendant={isDescendant}
-            sortable={!sortAlpha}
+            sortable={true}
           />
         )}
       </nav>

@@ -8,7 +8,14 @@ import {
   Trash2,
   FilePlus,
   GripVertical,
+  ArrowUpAZ,
 } from 'lucide-react';
+
+function sortAlphabetically(nodes: PageTreeNode[]): PageTreeNode[] {
+  return [...nodes]
+    .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }))
+    .map(n => ({ ...n, children: sortAlphabetically(n.children) }));
+}
 
 interface SidebarProps {
   pages: PageTreeNode[];
@@ -287,7 +294,11 @@ function PageItem({
 }
 
 export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage }: SidebarProps) {
-  const displayedPages = pages;
+  const [sortAlpha, setSortAlpha] = useState(false);
+
+  const toggleSort = () => setSortAlpha(prev => !prev);
+
+  const displayedPages = sortAlpha ? sortAlphabetically(pages) : pages;
   const descendantMap = buildDescendantMap(pages);
 
   const isDescendant = (ancestorId: string, targetId: string): boolean => {
@@ -300,6 +311,14 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
         <button className="btn-new-page" onClick={() => onNewPage(null)}>
           <Plus size={15} />
           <span>New Page</span>
+        </button>
+        <button
+          className={`btn-icon${sortAlpha ? ' btn-icon--active' : ''}`}
+          onClick={toggleSort}
+          title={sortAlpha ? 'Alphabetical order (click to switch to manual)' : 'Manual order (click to sort alphabetically)'}
+          aria-label="Toggle alphabetical sort"
+        >
+          <ArrowUpAZ size={15} />
         </button>
       </div>
 
@@ -318,7 +337,7 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
             onReorderPages={onReorderPages}
             onReparentPage={onReparentPage}
             isDescendant={isDescendant}
-            sortable={true}
+            sortable={!sortAlpha}
           />
         )}
       </nav>

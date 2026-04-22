@@ -313,7 +313,7 @@ export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage
           <span>New Page</span>
         </button>
         <button
-          className={`btn-icon${sortAlpha ? ' btn-icon--active' : ''}`}
+          className="btn-icon btn-icon--active"
           onClick={toggleSort}
           title={sortAlpha ? 'Alphabetical order (click to switch to manual)' : 'Manual order (click to sort alphabetically)'}
           aria-label="Toggle alphabetical sort"

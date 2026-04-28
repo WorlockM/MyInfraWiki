@@ -1020,10 +1020,25 @@ html, body, #root {
   line-height: 1.4;
 }
 
-.resize-toolbar button:hover {
+.resize-toolbar button:hover,
+.resize-toolbar button.active {
   background: var(--color-primary);
   color: #fff;
   border-color: var(--color-primary);
+}
+
+.resize-toolbar-divider {
+  width: 1px;
+  background: var(--color-border);
+  margin: 2px 3px;
+  align-self: stretch;
+}
+
+/* Clearfix after floated images */
+.tiptap-editor .ProseMirror::after {
+  content: '';
+  display: table;
+  clear: both;
 }
 
 .tiptap-editor .ProseMirror hr {

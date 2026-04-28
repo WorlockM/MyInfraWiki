@@ -1,6 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
+import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -10,12 +11,15 @@ declare module '@tiptap/core' {
   }
 }
 
+type ImageAlign = 'left' | 'center' | 'right';
+
 function ResizableImageComponent({ node, updateAttributes, selected, editor }: NodeViewProps) {
-  const { src, alt, title, width } = node.attrs as {
+  const { src, alt, title, width, align } = node.attrs as {
     src: string;
     alt?: string;
     title?: string;
     width?: number | null;
+    align?: ImageAlign;
   };
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,6 +27,8 @@ function ResizableImageComponent({ node, updateAttributes, selected, editor }: N
   const startX = useRef(0);
   const startWidth = useRef(0);
   const isEditable = editor.isEditable;
+
+  const currentAlign: ImageAlign = align ?? 'center';
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!isEditable) return;
@@ -58,15 +64,22 @@ function ResizableImageComponent({ node, updateAttributes, selected, editor }: N
     updateAttributes({ width: Math.round(containerWidth * pct / 100) });
   }, [updateAttributes]);
 
+  const wrapperStyle: React.CSSProperties =
+    currentAlign === 'left'
+      ? { float: 'left', margin: '0.5em 1.2em 0.5em 0', display: 'block' }
+      : currentAlign === 'right'
+      ? { float: 'right', margin: '0.5em 0 0.5em 1.2em', display: 'block' }
+      : { display: 'block', margin: '0.5em auto', textAlign: 'center' };
+
   const containerStyle: React.CSSProperties = {
-    width: width ? `${width}px` : '100%',
+    width: width ? `${width}px` : currentAlign === 'center' ? '100%' : undefined,
     maxWidth: '100%',
     position: 'relative',
     display: 'inline-block',
   };
 
   return (
-    <NodeViewWrapper style={{ display: 'block', margin: '0.5em 0' }}>
+    <NodeViewWrapper style={wrapperStyle}>
       <div
         ref={containerRef}
         className={`resizable-image-container${selected && isEditable ? ' resizable-image--selected' : ''}`}
@@ -88,6 +101,31 @@ function ResizableImageComponent({ node, updateAttributes, selected, editor }: N
               title="Sleep om te resizen"
             />
             <div className="resize-toolbar">
+              <button
+                type="button"
+                className={currentAlign === 'left' ? 'active' : ''}
+                onClick={() => updateAttributes({ align: 'left' })}
+                title="Links uitlijnen"
+              >
+                <AlignLeft size={12} />
+              </button>
+              <button
+                type="button"
+                className={currentAlign === 'center' ? 'active' : ''}
+                onClick={() => updateAttributes({ align: 'center' })}
+                title="Centreren"
+              >
+                <AlignCenter size={12} />
+              </button>
+              <button
+                type="button"
+                className={currentAlign === 'right' ? 'active' : ''}
+                onClick={() => updateAttributes({ align: 'right' })}
+                title="Rechts uitlijnen"
+              >
+                <AlignRight size={12} />
+              </button>
+              <span className="resize-toolbar-divider" />
               <button type="button" onClick={() => setPresetWidth(25)} title="25% breedte">25%</button>
               <button type="button" onClick={() => setPresetWidth(50)} title="50% breedte">50%</button>
               <button type="button" onClick={() => setPresetWidth(75)} title="75% breedte">75%</button>
@@ -123,6 +161,21 @@ export const ResizableImage = Node.create({
         renderHTML: (attrs) => {
           if (!attrs.width) return {};
           return { width: String(attrs.width) };
+        },
+      },
+      align: {
+        default: 'center',
+        parseHTML: (el) => {
+          const img = el as HTMLImageElement;
+          const style = img.closest('[data-align]')?.getAttribute('data-align');
+          if (style === 'left' || style === 'right') return style;
+          const float = img.style.float;
+          if (float === 'left' || float === 'right') return float;
+          return 'center';
+        },
+        renderHTML: (attrs) => {
+          if (!attrs.align || attrs.align === 'center') return {};
+          return { 'data-align': attrs.align };
         },
       },
     };

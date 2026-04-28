@@ -1,16 +1,22 @@
 import React, { useRef, useCallback } from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
-import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
+import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 
-interface ResizableImageComponentProps {
-  node: { attrs: { src: string; alt?: string; title?: string; width?: number | null } };
-  updateAttributes: (attrs: Record<string, unknown>) => void;
-  selected: boolean;
-  editor: { isEditable: boolean };
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    image: {
+      setImage: (options: { src: string; alt?: string; title?: string }) => ReturnType;
+    };
+  }
 }
 
-function ResizableImageComponent({ node, updateAttributes, selected, editor }: ResizableImageComponentProps) {
-  const { src, alt, title, width } = node.attrs;
+function ResizableImageComponent({ node, updateAttributes, selected, editor }: NodeViewProps) {
+  const { src, alt, title, width } = node.attrs as {
+    src: string;
+    alt?: string;
+    title?: string;
+    width?: number | null;
+  };
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);

@@ -6,7 +6,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import Image from '@tiptap/extension-image';
+import { ResizableImage } from './ResizableImage';
 import Placeholder from '@tiptap/extension-placeholder';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import Table from '@tiptap/extension-table';
@@ -410,7 +410,7 @@ export default function Editor({
       Highlight,
       TaskList,
       TaskItem.configure({ nested: true }),
-      Image.configure({ inline: false, allowBase64: false }),
+      ResizableImage,
       Placeholder.configure({ placeholder: 'Start writing...' }),
       CodeBlockWithCopy,
       Callout,

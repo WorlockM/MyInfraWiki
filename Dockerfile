@@ -24,6 +24,10 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 
+# su-exec lets the entrypoint drop from root to the node user after fixing
+# /data ownership on volumes created by older (root-running) images
+RUN apk add --no-cache su-exec
+
 # Install build tools, install production deps, then remove tools — all in one
 # layer so intermediate files don't bloat the final image
 COPY backend/package*.json ./
@@ -47,9 +51,14 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-USER node
+# The entrypoint starts as root, ensures /data is owned by the node user
+# (also migrating volumes from older root-running images), then drops
+# privileges via su-exec before starting the app.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -q -O /dev/null "http://127.0.0.1:${PORT}/api/health" || exit 1
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

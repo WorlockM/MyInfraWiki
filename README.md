@@ -96,9 +96,9 @@ MyInfraWiki has **no built-in authentication** — anyone who can reach the port
 - a VPN or overlay network such as WireGuard or Tailscale,
 - or at minimum a firewall rule restricting access to trusted hosts.
 
-Uploaded files are served with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so they download instead of executing in the browser. The container runs as the unprivileged `node` user. A liveness endpoint is available at `GET /api/health`.
+Uploaded files are served with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so they download instead of executing in the browser. The app itself runs as the unprivileged `node` user: the entrypoint starts as root only to make `/data` writable for that user (including volumes created by older versions), then drops privileges. A liveness endpoint is available at `GET /api/health`.
 
-> **Note:** if you use a bind mount instead of a named volume for `/data`, make sure the directory is writable by UID 1000 (the `node` user), e.g. `chown -R 1000:1000 ./data`.
+> **Note:** if you override the container user with `user:` in your compose file, the entrypoint cannot fix ownership for you — make sure `/data` is writable by that user.
 
 ---
 

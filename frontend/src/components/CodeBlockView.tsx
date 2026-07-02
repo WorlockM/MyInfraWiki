@@ -13,8 +13,9 @@ function getMermaidTheme(): 'dark' | 'default' {
   return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
 }
 
-// Initialize once globally
-mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme(), securityLevel: 'loose' });
+// Initialize once globally. 'strict' sanitizes the generated SVG, which is
+// injected into the page via dangerouslySetInnerHTML below.
+mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme(), securityLevel: 'strict' });
 
 let renderCounter = 0;
 
@@ -32,6 +33,7 @@ function MermaidDiagram({ code }: { code: string }) {
 
   useEffect(() => {
     if (!code.trim()) return;
+    let cancelled = false;
     setSvg('');
     setError('');
 
@@ -39,17 +41,25 @@ function MermaidDiagram({ code }: { code: string }) {
     const id = `mermaid-${++renderCounter}`;
     idRef.current = id;
 
-    mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'loose' });
+    mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'strict' });
 
-    // v9 uses a synchronous string-returning API
-    try {
-      const rendered = mermaid.render(id, code.trim());
-      setSvg(rendered);
-    } catch (err: unknown) {
-      setError(String(err instanceof Error ? err.message : err).split('\n')[0]);
-    } finally {
-      document.getElementById(id)?.remove();
-    }
+    mermaid
+      .render(id, code.trim())
+      .then(({ svg: rendered }) => {
+        if (!cancelled) setSvg(rendered);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(String(err instanceof Error ? err.message : err).split('\n')[0]);
+      })
+      .finally(() => {
+        // Mermaid can leave scratch/error elements in the DOM
+        document.getElementById(id)?.remove();
+        document.getElementById(`d${id}`)?.remove();
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [code, theme]);
 
   if (error) return (

@@ -3,7 +3,7 @@ import axios from 'axios';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
 import SearchModal from './components/SearchModal';
-import { Moon, Sun, Search, Menu } from 'lucide-react';
+import { Moon, Sun, Search, Menu, Download, FileText } from 'lucide-react';
 
 export interface PageTreeNode {
   id: string;
@@ -52,9 +52,15 @@ function buildTree(pages: Omit<PageTreeNode, 'children'>[]): PageTreeNode[] {
   return roots;
 }
 
+function getPageIdFromHash(): string | null {
+  const match = window.location.hash.match(/^#\/page\/([A-Za-z0-9-]+)/);
+  return match ? match[1] : null;
+}
+
 export default function App() {
   const [pages, setPages] = useState<PageTreeNode[]>([]);
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [flatPages, setFlatPages] = useState<Omit<PageTreeNode, 'children'>[]>([]);
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(() => getPageIdFromHash());
   const [newPageId, setNewPageId] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const stored = localStorage.getItem('darkMode');
@@ -66,6 +72,10 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const editorDirtyCheckRef = useRef<() => boolean>(() => false);
+
+  // Current selection, readable from event handlers without re-subscribing
+  const selectedPageIdRef = useRef(selectedPageId);
+  selectedPageIdRef.current = selectedPageId;
 
   // Apply dark mode
   useEffect(() => {
@@ -91,7 +101,15 @@ export default function App() {
   const fetchPages = useCallback(async () => {
     try {
       const res = await axios.get<Omit<PageTreeNode, 'children'>[]>('/api/pages');
+      setFlatPages(res.data);
       setPages(buildTree(res.data));
+
+      // Drop a selection (e.g. from a stale deep link) that no longer exists
+      const selected = selectedPageIdRef.current;
+      if (selected && !res.data.some((p) => p.id === selected)) {
+        setSelectedPageId(null);
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
     } catch (err) {
       console.error('Failed to fetch pages:', err);
     } finally {
@@ -110,12 +128,34 @@ export default function App() {
     return true;
   }, []);
 
+  // Deep links + browser back/forward: the selected page lives in the URL
+  // hash (#/page/<id>); hash changes drive the selection.
+  useEffect(() => {
+    const onHashChange = () => {
+      const id = getPageIdFromHash();
+      if (id === selectedPageIdRef.current) return;
+      if (!confirmIfDirty()) {
+        // Put the previous hash back; the resulting event is a no-op above
+        window.location.hash = selectedPageIdRef.current
+          ? `/page/${selectedPageIdRef.current}`
+          : '';
+        return;
+      }
+      setSelectedPageId(id);
+      setNewPageId(null);
+      setSidebarOpen(false);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [confirmIfDirty]);
+
   const handleSelectPage = useCallback(
     (id: string) => {
       if (!confirmIfDirty()) return;
       setSelectedPageId(id);
       setNewPageId(null);
       setSidebarOpen(false);
+      window.location.hash = `/page/${id}`;
     },
     [confirmIfDirty]
   );
@@ -131,6 +171,7 @@ export default function App() {
       await fetchPages();
       setNewPageId(res.data.id);
       setSelectedPageId(res.data.id);
+      window.location.hash = `/page/${res.data.id}`;
     } catch (err) {
       console.error('Failed to create page:', err);
     }
@@ -141,6 +182,7 @@ export default function App() {
       await axios.delete(`/api/pages/${id}`);
       if (selectedPageId === id) {
         setSelectedPageId(null);
+        history.replaceState(null, '', window.location.pathname + window.location.search);
       }
       await fetchPages();
     } catch (err) {
@@ -157,11 +199,9 @@ export default function App() {
     }
   }, [fetchPages]);
 
-  const handleReorderPages = useCallback(async (parentId: string | null, orderedIds: string[]) => {
+  const handleReorderPages = useCallback(async (_parentId: string | null, orderedIds: string[]) => {
     try {
-      await Promise.all(
-        orderedIds.map((id, index) => axios.put(`/api/pages/${id}`, { position: index }))
-      );
+      await axios.put('/api/pages/reorder', { ordered_ids: orderedIds });
       await fetchPages();
     } catch (err) {
       console.error('Failed to reorder pages:', err);
@@ -195,6 +235,14 @@ export default function App() {
               aria-label="Open search"
             >
               <Search size={16} />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => { window.location.href = '/api/export'; }}
+              title="Export wiki (Markdown zip)"
+              aria-label="Export wiki"
+            >
+              <Download size={16} />
             </button>
             <button
               className="icon-btn"
@@ -261,6 +309,27 @@ export default function App() {
                   <img src="/logo-icon.png" alt="MyInfraWiki" style={{ width: 80, marginBottom: 16 }} />
                   <h2>MyInfraWiki</h2>
                   <p>Select a page from the sidebar or create a new one to get started.</p>
+                  <div className="recent-pages">
+                    <div className="recent-pages__header">Recently updated</div>
+                    <ul className="recent-pages__list">
+                      {[...flatPages]
+                        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+                        .slice(0, 8)
+                        .map((p) => (
+                          <li key={p.id}>
+                            <button className="recent-pages__item" onClick={() => handleSelectPage(p.id)}>
+                              <FileText size={14} />
+                              <span className="recent-pages__title">{p.title || 'Untitled'}</span>
+                              <span className="recent-pages__date">
+                                {new Date(p.updated_at).toLocaleDateString(undefined, {
+                                  day: '2-digit', month: 'short', year: 'numeric',
+                                })}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
                 </>
               )}
             </div>

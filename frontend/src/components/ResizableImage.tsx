@@ -75,12 +75,12 @@ function ResizableImageComponent({ node, updateAttributes, selected, editor }: N
         />
         {selected && isEditable && (
           <>
-            <div className="resize-handle" onMouseDown={handleMouseDown} title="Sleep om te resizen" />
+            <div className="resize-handle" onMouseDown={handleMouseDown} title="Drag to resize" />
             <div className="resize-toolbar">
-              <button type="button" onClick={() => setPresetWidth(25)} title="25% breedte">25%</button>
-              <button type="button" onClick={() => setPresetWidth(50)} title="50% breedte">50%</button>
-              <button type="button" onClick={() => setPresetWidth(75)} title="75% breedte">75%</button>
-              <button type="button" onClick={() => setPresetWidth(null)} title="Volledige breedte">100%</button>
+              <button type="button" onClick={() => setPresetWidth(25)} title="25% width">25%</button>
+              <button type="button" onClick={() => setPresetWidth(50)} title="50% width">50%</button>
+              <button type="button" onClick={() => setPresetWidth(75)} title="75% width">75%</button>
+              <button type="button" onClick={() => setPresetWidth(null)} title="Full width">100%</button>
             </div>
           </>
         )}

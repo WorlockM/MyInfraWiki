@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 import { X, Clock, RotateCcw } from 'lucide-react';
 
 interface Version {
@@ -235,7 +236,7 @@ export default function HistoryModal({ pageId, currentContent, onClose, onRestor
                 {view === 'preview' ? (
                   <div
                     className="history-preview-content tiptap-editor"
-                    dangerouslySetInnerHTML={{ __html: selected.content }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selected.content) }}
                   />
                 ) : (
                   <div className="history-preview-content">

@@ -5,6 +5,9 @@ import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import Database from 'better-sqlite3';
+import archiver from 'archiver';
+import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -40,20 +43,35 @@ function stripHtml(html: string): string {
 }
 
 // Delete uploaded files that are no longer referenced in any page content
+// or any version snapshot. Files younger than the grace period are always
+// kept: an upload that is still being edited into a page has no reference yet.
+const UPLOAD_GRACE_MS = 24 * 60 * 60 * 1000;
+
 function cleanupOrphanedUploads() {
   try {
     const files = fs.readdirSync(UPLOADS_PATH);
     if (files.length === 0) return;
 
     const pages = db.prepare('SELECT content FROM pages').all() as { content: string }[];
-    const allContent = pages.map((p) => p.content).join(' ');
+    const versions = db.prepare('SELECT content FROM page_versions').all() as { content: string }[];
+    const allContent = pages
+      .map((p) => p.content)
+      .concat(versions.map((v) => v.content))
+      .join(' ');
 
+    const now = Date.now();
     for (const file of files) {
-      if (!allContent.includes(`/uploads/${file}`)) {
-        fs.unlink(path.join(UPLOADS_PATH, file), (err) => {
-          if (err) console.error(`Failed to delete orphaned upload ${file}:`, err);
-        });
+      if (allContent.includes(`/uploads/${file}`)) continue;
+
+      const filePath = path.join(UPLOADS_PATH, file);
+      try {
+        if (now - fs.statSync(filePath).mtimeMs < UPLOAD_GRACE_MS) continue;
+      } catch {
+        continue;
       }
+      fs.unlink(filePath, (err) => {
+        if (err) console.error(`Failed to delete orphaned upload ${file}:`, err);
+      });
     }
   } catch (err) {
     console.error('Error during upload cleanup:', err);
@@ -157,12 +175,27 @@ for page in pages:
 }
 
 // Middleware
-app.use(cors());
+// CORS is only needed in development, where the Vite dev server proxies from
+// another port. In production the backend serves the frontend same-origin,
+// and an open CORS policy would let any website read and modify the wiki.
+if (NODE_ENV !== 'production') {
+  app.use(cors());
+}
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files
-app.use('/uploads', express.static(UPLOADS_PATH));
+// Serve uploaded files. nosniff + attachment keep uploads inert: a crafted
+// SVG or HTML file downloads instead of executing scripts same-origin.
+// <img> tags render images regardless of Content-Disposition.
+app.use(
+  '/uploads',
+  express.static(UPLOADS_PATH, {
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', 'attachment');
+    },
+  })
+);
 
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
@@ -170,22 +203,63 @@ const storage = multer.diskStorage({
     cb(null, UPLOADS_PATH);
   },
   filename: (_req, file, cb) => {
-    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
+    const uniqueName = `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`;
     cb(null, uniqueName);
   },
 });
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (_req, file, cb) => {
-    const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
-    if (allowedMimes.includes(file.mimetype)) {
+// The client controls both the MIME type and the filename, so uploads are
+// validated on the stored extension (which determines how the file is later
+// served) rather than on the MIME type alone.
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+const ATTACHMENT_EXTENSIONS = [
+  ...IMAGE_EXTENSIONS,
+  '.pdf', '.txt', '.md', '.log', '.conf', '.cfg', '.ini', '.example',
+  '.json', '.yaml', '.yml', '.toml', '.xml', '.csv', '.tsv',
+  '.zip', '.gz', '.tgz', '.tar', '.7z',
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.pem', '.crt', '.pub', '.sql', '.ps1', '.sh', '.bak',
+];
+
+function extensionFilter(allowed: string[]): multer.Options['fileFilter'] {
+  return (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error(`File type "${ext || 'none'}" is not allowed`));
     }
+  };
+}
+
+const uploadImage = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: extensionFilter(IMAGE_EXTENSIONS),
+});
+
+// Attachments keep a readable filename so downloads aren't just a UUID.
+// The sanitised charset is URL-safe, the random prefix prevents collisions.
+const attachmentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, UPLOADS_PATH);
   },
+  filename: (_req, file, cb) => {
+    // Multer decodes the original filename as latin1; restore UTF-8 first
+    const original = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    const base = path
+      .basename(original)
+      .replace(/[^A-Za-z0-9._-]+/g, '_')
+      .slice(-80)
+      .toLowerCase();
+    cb(null, `${uuidv4().slice(0, 8)}_${base}`);
+  },
+});
+
+const uploadAttachment = multer({
+  storage: attachmentStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
+  fileFilter: extensionFilter(ATTACHMENT_EXTENSIONS),
 });
 
 // Helper: save a version snapshot before overwriting page content
@@ -285,6 +359,29 @@ app.post('/api/pages', (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/pages/reorder - set sibling order in one atomic call.
+// Registered before /api/pages/:id so "reorder" is not matched as a page id.
+// updated_at is intentionally left untouched: moving a page around is not a
+// content change and must not trigger edit-conflict detection.
+app.put('/api/pages/reorder', (req: Request, res: Response) => {
+  try {
+    const { ordered_ids } = req.body as { ordered_ids?: unknown };
+    if (!Array.isArray(ordered_ids) || ordered_ids.some((id) => typeof id !== 'string')) {
+      return res.status(400).json({ error: 'ordered_ids must be an array of page ids' });
+    }
+
+    const stmt = db.prepare('UPDATE pages SET position = ? WHERE id = ?');
+    db.transaction(() => {
+      (ordered_ids as string[]).forEach((id, index) => stmt.run(index, id));
+    })();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error reordering pages:', err);
+    res.status(500).json({ error: 'Failed to reorder pages' });
+  }
+});
+
 // PUT /api/pages/:id - update a page
 app.put('/api/pages/:id', (req: Request, res: Response) => {
   try {
@@ -315,13 +412,6 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
     const newParentId = parent_id !== undefined ? parent_id : existing.parent_id;
     const newPosition = position !== undefined ? position : existing.position;
 
-    // Save a version snapshot when title or content actually changes,
-    // but skip the very first save of a new page (still at default state)
-    const isNewPage = existing.title === 'Untitled' && existing.content === '';
-    if (!isNewPage && ((title !== undefined && title !== existing.title) || (content !== undefined && content !== existing.content))) {
-      saveVersion(req.params.id, existing.title, existing.content);
-    }
-
     // Guard: prevent circular reference (moving a page under its own descendant)
     if (newParentId && newParentId !== existing.parent_id) {
       const descendants = getDescendantIds(req.params.id);
@@ -330,12 +420,25 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
       }
     }
 
-    db.prepare(
-      'UPDATE pages SET title = ?, content = ?, parent_id = ?, position = ?, updated_at = ? WHERE id = ?'
-    ).run(newTitle, newContent, newParentId, newPosition, now, req.params.id);
+    // Save a version snapshot when title or content actually changes,
+    // but skip the very first save of a new page (still at default state)
+    const isNewPage = existing.title === 'Untitled' && existing.content === '';
+    const shouldSnapshot =
+      !isNewPage &&
+      ((title !== undefined && title !== existing.title) ||
+        (content !== undefined && content !== existing.content));
+
+    db.transaction(() => {
+      if (shouldSnapshot) {
+        saveVersion(req.params.id, existing.title, existing.content);
+      }
+      db.prepare(
+        'UPDATE pages SET title = ?, content = ?, parent_id = ?, position = ?, updated_at = ? WHERE id = ?'
+      ).run(newTitle, newContent, newParentId, newPosition, now, req.params.id);
+      ftsUpdate(req.params.id, newTitle, newContent);
+    })();
 
     const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
-    ftsUpdate(req.params.id, newTitle, newContent);
     cleanupOrphanedUploads();
     res.json(page);
   } catch (err) {
@@ -476,7 +579,7 @@ app.get('/api/search', (req: Request, res: Response) => {
 });
 
 // POST /api/upload - upload an image
-app.post('/api/upload', upload.single('file'), (req: Request, res: Response) => {
+app.post('/api/upload', uploadImage.single('file'), (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -487,6 +590,152 @@ app.post('/api/upload', upload.single('file'), (req: Request, res: Response) => 
     console.error('Error uploading file:', err);
     res.status(500).json({ error: 'Upload failed' });
   }
+});
+
+// POST /api/upload-attachment - upload a non-image attachment
+app.post('/api/upload-attachment', uploadAttachment.single('file'), (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    // Multer decodes the original filename as latin1; restore UTF-8
+    const name = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const url = `/uploads/${req.file.filename}`;
+    res.json({ url, name });
+  } catch (err) {
+    console.error('Error uploading attachment:', err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// GET /api/health - liveness check for Docker healthchecks and monitoring
+app.get('/api/health', (_req: Request, res: Response) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ status: 'ok' });
+  } catch {
+    res.status(500).json({ status: 'error' });
+  }
+});
+
+// ─── Wiki export ──────────────────────────────────────────────────────────────
+
+// Make a page title safe to use as a file or directory name in the zip
+function safeFilename(title: string): string {
+  const cleaned = title
+    .replace(/[/\\:*?"<>|#%]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+  return cleaned || 'Untitled';
+}
+
+// GET /api/export - download the entire wiki as a zip of Markdown files,
+// organised in directories following the page hierarchy, plus all uploads.
+app.get('/api/export', (_req: Request, res: Response) => {
+  try {
+    const pages = db
+      .prepare('SELECT id, title, content, parent_id FROM pages ORDER BY position ASC, created_at ASC')
+      .all() as { id: string; title: string; content: string; parent_id: string | null }[];
+
+    // Group pages by parent; pages with a missing parent become root pages
+    const ids = new Set(pages.map((p) => p.id));
+    const childrenOf = new Map<string | null, typeof pages>();
+    for (const p of pages) {
+      const key = p.parent_id && ids.has(p.parent_id) ? p.parent_id : null;
+      const list = childrenOf.get(key) ?? [];
+      list.push(p);
+      childrenOf.set(key, list);
+    }
+
+    // Assign each page a zip path; children live in a directory named after
+    // their parent page. Duplicate titles get a numeric suffix.
+    const exportPath = new Map<string, string>();
+    const assignPaths = (parentId: string | null, dir: string) => {
+      const used = new Set<string>();
+      for (const p of childrenOf.get(parentId) ?? []) {
+        const base = safeFilename(p.title);
+        let name = base;
+        let i = 2;
+        while (used.has(name.toLowerCase())) name = `${base} (${i++})`;
+        used.add(name.toLowerCase());
+        const full = dir ? `${dir}/${name}` : name;
+        exportPath.set(p.id, full);
+        assignPaths(p.id, full);
+      }
+    };
+    assignPaths(null, '');
+
+    const turndown = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      bulletListMarker: '-',
+    });
+    turndown.use(gfm);
+
+    // Directory depth of the page currently being converted, so links to
+    // other pages and uploads can be made relative
+    const ctx = { depth: 0 };
+    const rel = (target: string) => '../'.repeat(ctx.depth) + target;
+
+    turndown.addRule('wikiLink', {
+      filter: (node) => node.nodeName === 'SPAN' && !!node.getAttribute('data-page-id'),
+      replacement: (content, node) => {
+        const pageId = (node as HTMLElement).getAttribute('data-page-id') ?? '';
+        const target = exportPath.get(pageId);
+        return target ? `[${content}](<${rel(target)}.md>)` : content;
+      },
+    });
+    turndown.addRule('callout', {
+      filter: (node) => node.nodeName === 'DIV' && node.getAttribute('data-type') === 'callout',
+      replacement: (content, node) => {
+        const type = (node as HTMLElement).getAttribute('data-callout-type') ?? 'info';
+        const body = content.trim().replace(/\n/g, '\n> ');
+        return `\n\n> **${type.toUpperCase()}:** ${body}\n\n`;
+      },
+    });
+    // Interactive widgets (table of contents, child-page list) have no
+    // meaning outside the app
+    turndown.addRule('dropWidgets', {
+      filter: (node) =>
+        node.nodeName === 'DIV' &&
+        ['table-of-contents', 'page-tree'].includes(node.getAttribute('data-type') ?? ''),
+      replacement: () => '',
+    });
+
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="myinfrawiki-export-${date}.zip"`);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      console.error('Export failed:', err);
+      res.destroy(err);
+    });
+    archive.pipe(res);
+
+    for (const p of pages) {
+      const pagePath = exportPath.get(p.id)!;
+      ctx.depth = pagePath.split('/').length - 1;
+      // Point upload references at the uploads/ directory in the zip
+      const html = p.content.split('"/uploads/').join(`"${rel('uploads/')}`);
+      const markdown = `# ${p.title}\n\n${turndown.turndown(html)}\n`;
+      archive.append(markdown, { name: `${pagePath}.md` });
+    }
+
+    if (fs.existsSync(UPLOADS_PATH)) {
+      archive.directory(UPLOADS_PATH, 'uploads');
+    }
+    archive.finalize();
+  } catch (err) {
+    console.error('Error exporting wiki:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Export failed' });
+  }
+});
+
+// Unknown API routes must return 404 instead of falling through to index.html
+app.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Not found' });
 });
 
 // In production, serve the frontend
@@ -502,6 +751,10 @@ if (NODE_ENV === 'production') {
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  // Upload validation errors (file too large, disallowed type) are client errors
+  if (err instanceof multer.MulterError || err.message.includes('is not allowed')) {
+    return res.status(400).json({ error: err.message });
+  }
   console.error('Unhandled error:', err);
   res.status(500).json({ error: err.message || 'Internal server error' });
 });

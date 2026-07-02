@@ -37,8 +37,8 @@ COPY --from=backend-build /app/backend/dist ./dist
 # Copy frontend build output (served by backend in production)
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Create data directories
-RUN mkdir -p /data/uploads
+# Create data directories, owned by the unprivileged node user
+RUN mkdir -p /data/uploads && chown -R node:node /data
 
 ENV NODE_ENV=production
 ENV DATABASE_PATH=/data/wiki.db
@@ -46,5 +46,10 @@ ENV UPLOADS_PATH=/data/uploads
 ENV PORT=3000
 
 EXPOSE 3000
+
+USER node
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT}/api/health" || exit 1
 
 CMD ["node", "dist/index.js"]

@@ -15,6 +15,9 @@
 - **Callout blocks** – info, warning and error styles
 - **Hierarchical pages** – nest pages under other pages via drag-and-drop
 - **Internal page links** – link directly to other wiki pages
+- **Deep links** – every page has its own URL (`#/page/<id>`), so you can bookmark pages and link to them from runbooks, tickets or monitoring alerts; browser back/forward works too
+- **Attachments** – attach files (PDF, configs, archives, and more) to a page via the paperclip button
+- **Wiki export** – download the entire wiki as a zip of Markdown files (organised by page hierarchy, uploads included) via the download button in the sidebar
 - **Table of Contents** – automatically generated from headings
 - **Page tree** – display child pages of the current page
 - **Images** – upload via drag-and-drop or paste from clipboard
@@ -82,6 +85,20 @@ docker run -d \
   --restart unless-stopped \
   ghcr.io/worlockm/myinfrawiki:latest
 ```
+
+---
+
+## Authentication & security
+
+MyInfraWiki has **no built-in authentication** — anyone who can reach the port can read and edit every page. Run it on a trusted network only, or put it behind something that handles authentication for you:
+
+- a reverse proxy with authentication (e.g. Nginx with basic auth, Caddy, Authelia, or an OAuth proxy),
+- a VPN or overlay network such as WireGuard or Tailscale,
+- or at minimum a firewall rule restricting access to trusted hosts.
+
+Uploaded files are served with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so they download instead of executing in the browser. The container runs as the unprivileged `node` user. A liveness endpoint is available at `GET /api/health`.
+
+> **Note:** if you use a bind mount instead of a named volume for `/data`, make sure the directory is writable by UID 1000 (the `node` user), e.g. `chown -R 1000:1000 ./data`.
 
 ---
 

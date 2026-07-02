@@ -51,6 +51,7 @@ import {
   AlertTriangle,
   AlertCircle,
   Link as LinkIcon,
+  Paperclip,
   BookOpen,
   Network,
   History,
@@ -109,9 +110,10 @@ function ToolbarButton({ onClick, active, title, children, disabled }: ToolbarBu
 interface ToolbarProps {
   editor: TipTapEditor;
   onWikiLink: () => void;
+  onAttachment: () => void;
 }
 
-function Toolbar({ editor, onWikiLink }: ToolbarProps) {
+function Toolbar({ editor, onWikiLink, onAttachment }: ToolbarProps) {
   return (
     <div className="editor-toolbar">
       <div className="toolbar-group">
@@ -316,6 +318,9 @@ function Toolbar({ editor, onWikiLink }: ToolbarProps) {
           title="Internal page link"
         >
           <LinkIcon size={15} />
+        </ToolbarButton>
+        <ToolbarButton onClick={onAttachment} title="Attach file">
+          <Paperclip size={15} />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor.chain().focus().insertTableOfContents().run()}
@@ -641,6 +646,37 @@ export default function Editor({
     }
   };
 
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAttachmentSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow picking the same file again later
+    if (!file || !editor) return;
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await axios.post<{ url: string; name: string }>('/api/upload-attachment', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'text',
+          text: res.data.name,
+          marks: [{ type: 'link', attrs: { href: res.data.url } }],
+        })
+        .run();
+    } catch (err) {
+      console.error('Attachment upload failed:', err);
+      const message =
+        axios.isAxiosError(err) && err.response?.data?.error
+          ? err.response.data.error
+          : 'Attachment upload failed';
+      window.alert(message);
+    }
+  };
+
   const handleWikiLinkSelect = useCallback(
     (selectedPageId: string, selectedPageTitle: string) => {
       setWikiLinkModalOpen(false);
@@ -769,7 +805,7 @@ export default function Editor({
                 type="text"
                 value={title}
                 onChange={handleTitleChange}
-                onMouseEnter={() => { if (title === 'Untitled') setTitle(''); }}
+                onFocus={() => { if (title === 'Untitled') setTitle(''); }}
                 onBlur={() => { if (title === '') setTitle('Untitled'); }}
                 onKeyDown={handleTitleKeyDown}
                 placeholder="Untitled"
@@ -818,7 +854,21 @@ export default function Editor({
         </div>
       </div>
 
-      {isEditing && editor && <Toolbar editor={editor} onWikiLink={() => setWikiLinkModalOpen(true)} />}
+      {isEditing && editor && (
+        <Toolbar
+          editor={editor}
+          onWikiLink={() => setWikiLinkModalOpen(true)}
+          onAttachment={() => attachmentInputRef.current?.click()}
+        />
+      )}
+      <input
+        ref={attachmentInputRef}
+        type="file"
+        style={{ display: 'none' }}
+        onChange={handleAttachmentSelected}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
 
       {conflictDetected && (
         <div className="conflict-banner">

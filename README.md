@@ -140,6 +140,15 @@ docker run --rm \
   alpine cp -r /data/uploads /backup/uploads
 ```
 
+**Automated Markdown export:**
+
+Besides the volume-level backup above, the wiki can export itself as a zip of Markdown files (including all uploads) via `GET /api/export` — a human-readable backup that needs no MyInfraWiki install to open. Schedule it with cron for a nightly export, for example:
+
+```bash
+# /etc/cron.d/myinfrawiki-export — nightly at 03:30, keep 14 days
+30 3 * * * backup curl -sf -o /backups/myinfrawiki-$(date +\%F).zip http://localhost:3000/api/export && find /backups -name 'myinfrawiki-*.zip' -mtime +14 -delete
+```
+
 **Restore:**
 
 ```bash

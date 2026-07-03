@@ -133,6 +133,15 @@ export default function HistoryModal({ pageId, currentContent, onClose, onRestor
       .finally(() => setLoading(false));
   }, [pageId]);
 
+  // Close on Escape, consistent with the other modals
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   const handleSelect = useCallback(
     async (v: Version) => {
       try {

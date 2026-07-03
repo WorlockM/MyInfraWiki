@@ -68,6 +68,7 @@ interface EditorProps {
   onNavigate?: (pageId: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onRegisterDirtyCheck?: (fn: () => boolean) => void;
+  existingPageIds?: string[];
 }
 
 interface PageData {
@@ -355,6 +356,7 @@ export default function Editor({
   onNavigate,
   onDirtyChange,
   onRegisterDirtyCheck,
+  existingPageIds,
 }: EditorProps) {
   const [title, setTitle] = useState('');
   const [isEditing, setIsEditing] = useState(defaultEditing);
@@ -613,11 +615,11 @@ export default function Editor({
     }
   }, [save]);
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     originalTitleRef.current = titleRef.current;
     originalContentRef.current = editor?.getHTML() ?? '';
     setIsEditing(true);
-  };
+  }, [editor]);
 
   const handleCancel = () => {
     if (isDirtyRef.current) {
@@ -771,19 +773,41 @@ export default function Editor({
   // Cmd+S / Ctrl+S to save — Cmd+E / Ctrl+E to edit
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === 's' && isEditing) {
-          e.preventDefault();
-          handleSave();
-        } else if (e.key === 'e' && !isEditing) {
-          e.preventDefault();
-          handleEdit();
-        }
+      if (!(e.metaKey || e.ctrlKey)) return;
+      // Ignore shortcuts while a modal (search, history, link picker) is open
+      if (document.querySelector('[role="dialog"]')) return;
+      if (e.key === 's' && isEditing) {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === 'e' && !isEditing) {
+        e.preventDefault();
+        handleEdit();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isEditing, handleSave, handleEdit]);
+
+  // In read mode, mark internal links whose target page no longer exists
+  useEffect(() => {
+    if (isEditing || loading || !existingPageIds) return;
+    const ids = new Set(existingPageIds);
+    const raf = requestAnimationFrame(() => {
+      document
+        .querySelectorAll<HTMLElement>('.editor-content-area .wiki-link')
+        .forEach((el) => {
+          const target = el.getAttribute('data-page-id');
+          const broken = !!target && !ids.has(target);
+          el.classList.toggle('wiki-link--broken', broken);
+          if (broken) {
+            el.title = 'This page no longer exists';
+          } else {
+            el.removeAttribute('title');
+          }
+        });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [existingPageIds, isEditing, loading, updatedAt]);
 
   if (loading) {
     return (

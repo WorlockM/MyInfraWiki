@@ -55,6 +55,32 @@ interface PageListProps {
   sortable: boolean;
 }
 
+// Collapsed pages are remembered across reloads. Only collapsed ids are
+// stored, so new pages default to expanded.
+const COLLAPSED_STORAGE_KEY = 'sidebarCollapsedPages';
+
+function readCollapsedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(COLLAPSED_STORAGE_KEY) ?? '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function storeCollapsed(id: string, collapsed: boolean) {
+  const ids = readCollapsedIds();
+  if (collapsed) {
+    ids.add(id);
+  } else {
+    ids.delete(id);
+  }
+  try {
+    localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Storage unavailable (e.g. private mode); collapse state is not persisted
+  }
+}
+
 function collectDescendantIds(node: PageTreeNode): string[] {
   const ids: string[] = [];
   for (const child of node.children) {
@@ -183,7 +209,7 @@ function PageItem({
   node, depth, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage,
   isDescendant, sortable, dragging, dropPosition, onDragStart, onDragEnd, onDragOver, onDrop,
 }: PageItemProps) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(() => !readCollapsedIds().has(node.id));
   const [hovered, setHovered] = useState(false);
   const hasChildren = node.children.length > 0;
   const isSelected = node.id === selectedPageId;
@@ -202,6 +228,7 @@ function PageItem({
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
+    storeCollapsed(node.id, expanded); // currently expanded → about to collapse
     setExpanded(v => !v);
   };
 

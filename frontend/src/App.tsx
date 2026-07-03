@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
@@ -77,6 +77,10 @@ export default function App() {
   const selectedPageIdRef = useRef(selectedPageId);
   selectedPageIdRef.current = selectedPageId;
 
+  const existingPageIds = useMemo(() => flatPages.map((p) => p.id), [flatPages]);
+  const existingPageIdsRef = useRef(existingPageIds);
+  existingPageIdsRef.current = existingPageIds;
+
   // Apply dark mode
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
@@ -151,6 +155,12 @@ export default function App() {
 
   const handleSelectPage = useCallback(
     (id: string) => {
+      // A wiki-link can point at a page that has since been deleted
+      const ids = existingPageIdsRef.current;
+      if (ids.length > 0 && !ids.includes(id)) {
+        window.alert('This page no longer exists. It may have been deleted.');
+        return;
+      }
       if (!confirmIfDirty()) return;
       setSelectedPageId(id);
       setNewPageId(null);
@@ -292,6 +302,7 @@ export default function App() {
             defaultEditing={selectedPageId === newPageId}
             onNavigate={handleSelectPage}
             onRegisterDirtyCheck={(fn) => { editorDirtyCheckRef.current = fn; }}
+            existingPageIds={existingPageIds}
           />
         ) : (
           <div className="empty-state">

@@ -20,12 +20,16 @@ export default function SearchModal({ onClose, onSelectPage }: SearchModalProps)
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeqRef = useRef(0);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   const search = useCallback(async (q: string) => {
+    // Sequence number so a slow response to an older query can never
+    // overwrite the results of a newer one
+    const seq = ++searchSeqRef.current;
     if (!q.trim()) {
       setResults([]);
       return;
@@ -33,12 +37,13 @@ export default function SearchModal({ onClose, onSelectPage }: SearchModalProps)
     setLoading(true);
     try {
       const res = await axios.get<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`);
+      if (seq !== searchSeqRef.current) return;
       setResults(res.data);
       setSelectedIndex(0);
     } catch (err) {
       console.error('Search failed:', err);
     } finally {
-      setLoading(false);
+      if (seq === searchSeqRef.current) setLoading(false);
     }
   }, []);
 

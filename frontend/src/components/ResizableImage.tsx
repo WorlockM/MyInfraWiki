@@ -106,7 +106,8 @@ export const ResizableImage = Node.create({
         parseHTML: (el) => {
           const img = el as HTMLImageElement;
           const w = img.getAttribute('width') ?? img.style.width;
-          if (!w) return null;
+          // The width attribute is in pixels; "50%" must not become 50px
+          if (!w || w.includes('%')) return null;
           const parsed = parseInt(w);
           return isNaN(parsed) ? null : parsed;
         },

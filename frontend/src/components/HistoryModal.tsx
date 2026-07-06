@@ -30,9 +30,9 @@ interface DiffToken {
 }
 
 function htmlToText(html: string): string {
-  const el = document.createElement('div');
-  el.innerHTML = html;
-  return el.textContent ?? '';
+  // DOMParser produces an inert document: unlike innerHTML on a detached
+  // element it never loads resources or fires event handlers (onerror XSS)
+  return new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '';
 }
 
 /** Split text into word+whitespace tokens, preserving whitespace as separate entries */

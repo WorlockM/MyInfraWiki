@@ -78,10 +78,12 @@ function cleanupOrphanedUploads() {
   }
 }
 
-// Build a safe FTS5 MATCH expression from user input
+// Build a safe FTS5 MATCH expression from user input. Each word is wrapped
+// in double quotes so tokens with punctuation (10.0.5.32, e-mail, srv-prod-01)
+// are treated as phrases instead of causing FTS5 syntax errors.
 function buildFtsQuery(q: string): string {
   const words = q.replace(/["'*^(){}[\]|\\]/g, ' ').trim().split(/\s+/).filter(Boolean);
-  return words.map((w) => `${w}*`).join(' ');
+  return words.map((w) => `"${w}"*`).join(' ');
 }
 
 // Initialize database schema
@@ -420,13 +422,16 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
       }
     }
 
-    // Save a version snapshot when title or content actually changes,
-    // but skip the very first save of a new page (still at default state)
+    // Only a real title/content change counts as an edit: it triggers a
+    // version snapshot and bumps updated_at. Moving a page (parent_id or
+    // position) leaves updated_at alone so it doesn't trigger edit-conflict
+    // detection or pollute the "recently updated" list.
+    const isEdited =
+      (title !== undefined && title !== existing.title) ||
+      (content !== undefined && content !== existing.content);
     const isNewPage = existing.title === 'Untitled' && existing.content === '';
-    const shouldSnapshot =
-      !isNewPage &&
-      ((title !== undefined && title !== existing.title) ||
-        (content !== undefined && content !== existing.content));
+    const shouldSnapshot = !isNewPage && isEdited;
+    const newUpdatedAt = isEdited ? now : existing.updated_at;
 
     db.transaction(() => {
       if (shouldSnapshot) {
@@ -434,12 +439,12 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
       }
       db.prepare(
         'UPDATE pages SET title = ?, content = ?, parent_id = ?, position = ?, updated_at = ? WHERE id = ?'
-      ).run(newTitle, newContent, newParentId, newPosition, now, req.params.id);
+      ).run(newTitle, newContent, newParentId, newPosition, newUpdatedAt, req.params.id);
       ftsUpdate(req.params.id, newTitle, newContent);
     })();
 
     const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
-    cleanupOrphanedUploads();
+    setImmediate(cleanupOrphanedUploads);
     res.json(page);
   } catch (err) {
     console.error('Error updating page:', err);
@@ -466,7 +471,7 @@ app.delete('/api/pages/:id', (req: Request, res: Response) => {
     });
     deleteMany(allIds);
     for (const id of allIds) ftsDelete(id);
-    cleanupOrphanedUploads();
+    setImmediate(cleanupOrphanedUploads);
 
     res.json({ success: true, deleted: allIds.length });
   } catch (err) {
@@ -541,9 +546,12 @@ app.get('/api/pages/:id/backlinks', (req: Request, res: Response) => {
     const page = db.prepare('SELECT id FROM pages WHERE id = ?').get(req.params.id);
     if (!page) return res.status(404).json({ error: 'Page not found' });
 
+    // Escape LIKE wildcards; the id comes from the URL and is not guaranteed
+    // to be a well-formed uuid
+    const idEscaped = req.params.id.replace(/[\\%_]/g, (c) => `\\${c}`);
     const backlinks = db
-      .prepare(`SELECT id, title FROM pages WHERE content LIKE ? AND id != ?`)
-      .all(`%data-page-id="${req.params.id}"%`, req.params.id);
+      .prepare(`SELECT id, title FROM pages WHERE content LIKE ? ESCAPE '\\' AND id != ?`)
+      .all(`%data-page-id="${idEscaped}"%`, req.params.id);
     res.json(backlinks);
   } catch (err) {
     console.error('Error fetching backlinks:', err);

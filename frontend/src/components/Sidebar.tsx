@@ -266,7 +266,9 @@ function PageItem({
 
         <span className="page-row__title">{node.title || 'Untitled'}</span>
 
-        {hovered && (
+        {/* Also shown when selected: touch devices have no hover, so tapping
+            the page is the only way to reach these actions there */}
+        {(hovered || isSelected) && (
           <div className="page-row__actions">
             <button
               className="page-row__action-btn"
@@ -317,14 +319,20 @@ function PageItem({
 
 export default function Sidebar({ pages, selectedPageId, onSelectPage, onNewPage, onDeletePage, onReorderPages, onReparentPage }: SidebarProps) {
   const handleSortAlphabetically = () => {
-    const collectGroups = (nodes: PageTreeNode[], parentId: string | null) => {
+    // Positions are only compared between siblings, so all groups can be
+    // flattened into a single ordered list: one request instead of one per page
+    const orderedIds: string[] = [];
+    const visit = (nodes: PageTreeNode[]) => {
       const sorted = [...nodes].sort((a, b) =>
         (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' })
       );
-      onReorderPages(parentId, sorted.map(n => n.id));
-      nodes.forEach(n => collectGroups(n.children, n.id));
+      for (const n of sorted) {
+        orderedIds.push(n.id);
+        visit(n.children);
+      }
     };
-    collectGroups(pages, null);
+    visit(pages);
+    onReorderPages(null, orderedIds);
   };
 
   const displayedPages = pages;

@@ -484,17 +484,21 @@ export default function Editor({
         }
         return false;
       },
-      handlePaste: (_view, event) => {
+      handlePaste: (view, event) => {
         const items = Array.from(event.clipboardData?.items ?? []);
         const imageItems = items.filter((item) => item.type.startsWith('image/'));
         if (imageItems.length) {
           event.preventDefault();
+          // Insert via the view, not the `editor` binding: that closure is
+          // captured before useEditor returns an instance and stays null.
           imageItems.forEach(async (item) => {
             const file = item.getAsFile();
             if (!file) return;
             try {
               const url = await uploadImage(file);
-              editor?.chain().focus().setImage({ src: url }).run();
+              const { schema } = view.state;
+              const node = schema.nodes.image.create({ src: url });
+              view.dispatch(view.state.tr.replaceSelectionWith(node));
             } catch (err) {
               console.error('Image paste upload failed:', err);
             }
@@ -715,59 +719,62 @@ export default function Editor({
   );
 
   const handlePdf = useCallback(async () => {
-    const html2pdf = ((await import('html2pdf.js')) as any).default; // eslint-disable-line @typescript-eslint/no-explicit-any
-
     const content = document.querySelector('.editor-content-area');
     if (!content) return;
 
     // Cover the page so the user doesn't see the theme switch
     const overlay = document.createElement('div');
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    overlay.style.cssText = `position:fixed;inset:0;z-index:99999;background:${isDark ? '#1a1a1e' : '#ffffff'};`;
-    document.body.appendChild(overlay);
-
-    // Wait for overlay to actually paint before switching theme
-    await new Promise(r => requestAnimationFrame(r));
-
-    // Switch to light mode so html2canvas captures light computed styles
     const root = document.documentElement;
     const prevTheme = root.getAttribute('data-theme');
-    root.setAttribute('data-theme', 'light');
-
-    // Wait for light styles to be applied
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    overlay.style.cssText = `position:fixed;inset:0;z-index:99999;background:${prevTheme === 'dark' ? '#1a1a1e' : '#ffffff'};`;
+    document.body.appendChild(overlay);
 
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'font-family:sans-serif;color:#000;padding:0;';
+    try {
+      const html2pdf = ((await import('html2pdf.js')) as any).default; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const titleEl = document.createElement('h1');
-    titleEl.textContent = titleRef.current || 'Untitled';
-    titleEl.style.cssText = 'font-size:24pt;margin:0 0 16px 0;padding-bottom:8px;border-bottom:1px solid #ccc;';
-    wrapper.appendChild(titleEl);
+      // Wait for overlay to actually paint before switching theme
+      await new Promise(r => requestAnimationFrame(r));
 
-    const contentClone = content.cloneNode(true) as HTMLElement;
-    contentClone.querySelectorAll('.page-updated-at, .backlinks-section').forEach(el => el.remove());
-    wrapper.appendChild(contentClone);
+      // Switch to light mode so html2canvas captures light computed styles
+      root.setAttribute('data-theme', 'light');
 
-    document.body.appendChild(wrapper);
+      // Wait for light styles to be applied
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    await html2pdf()
-      .set({
-        margin: 15,
-        filename: `${titleRef.current || 'page'}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      })
-      .from(wrapper)
-      .save();
+      wrapper.style.cssText = 'font-family:sans-serif;color:#000;padding:0;';
 
-    document.body.removeChild(wrapper);
+      const titleEl = document.createElement('h1');
+      titleEl.textContent = titleRef.current || 'Untitled';
+      titleEl.style.cssText = 'font-size:24pt;margin:0 0 16px 0;padding-bottom:8px;border-bottom:1px solid #ccc;';
+      wrapper.appendChild(titleEl);
 
-    // Restore theme and remove overlay
-    if (prevTheme) root.setAttribute('data-theme', prevTheme);
-    else root.removeAttribute('data-theme');
-    document.body.removeChild(overlay);
+      const contentClone = content.cloneNode(true) as HTMLElement;
+      contentClone.querySelectorAll('.page-updated-at, .backlinks-section').forEach(el => el.remove());
+      wrapper.appendChild(contentClone);
+
+      document.body.appendChild(wrapper);
+
+      await html2pdf()
+        .set({
+          margin: 15,
+          filename: `${titleRef.current || 'page'}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        })
+        .from(wrapper)
+        .save();
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      window.alert('PDF export failed. See the browser console for details.');
+    } finally {
+      // Always restore the theme and unblock the UI, even when export fails
+      wrapper.remove();
+      if (prevTheme) root.setAttribute('data-theme', prevTheme);
+      else root.removeAttribute('data-theme');
+      overlay.remove();
+    }
   }, []);
 
   // Cmd+S / Ctrl+S to save — Cmd+E / Ctrl+E to edit
@@ -972,7 +979,11 @@ export default function Editor({
             onSaved();
             axios.get<PageData>(`/api/pages/${pageId}`).then((res) => {
               setTitle(res.data.title);
+              // Track the new updated_at, or the next save is a false conflict
+              setUpdatedAt(res.data.updated_at);
+              updatedAtRef.current = res.data.updated_at;
               editor?.commands.setContent(res.data.content || '');
+              setWordCount(editor?.storage.characterCount?.words() ?? 0);
               setDirty(false);
             });
           }}

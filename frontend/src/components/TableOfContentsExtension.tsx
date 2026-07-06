@@ -42,16 +42,13 @@ function TableOfContentsComponent({ editor }: { editor: Editor }) {
     };
   }, [editor]);
 
-  const handleHeadingClick = (text: string) => {
+  // The DOM headings appear in the same order as the doc traversal above, so
+  // the index identifies the exact heading even when titles are duplicated
+  const handleHeadingClick = (index: number) => {
     const editorEl = document.querySelector('.tiptap-editor');
     if (!editorEl) return;
     const headingEls = editorEl.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    for (const el of Array.from(headingEls)) {
-      if (el.textContent?.trim() === text.trim()) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        break;
-      }
-    }
+    headingEls[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -67,10 +64,10 @@ function TableOfContentsComponent({ editor }: { editor: Editor }) {
             <li key={i} style={{ paddingLeft: `${(h.level - 1) * 12}px` }}>
               <a
                 className="toc-node__item"
-                onClick={() => handleHeadingClick(h.text)}
+                onClick={() => handleHeadingClick(i)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && handleHeadingClick(h.text)}
+                onKeyDown={(e) => e.key === 'Enter' && handleHeadingClick(i)}
               >
                 {h.text || '(empty heading)'}
               </a>

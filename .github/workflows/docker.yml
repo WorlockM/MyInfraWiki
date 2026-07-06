@@ -50,6 +50,13 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Keep tags as single image manifests. With provenance/SBOM enabled
+          # the tag becomes an OCI index whose child manifests show up as
+          # untagged package versions — which the weekly cleanup workflow then
+          # deletes, breaking pulls of the tagged image (this happened to all
+          # release tags and :latest).
+          provenance: false
+          sbom: false
           build-args: |
             APP_VERSION=${{ github.ref_name }}
             APP_COMMIT=${{ github.sha }}

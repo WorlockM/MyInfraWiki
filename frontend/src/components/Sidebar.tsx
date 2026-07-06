@@ -290,10 +290,6 @@ function PageItem({
         )}
       </div>
 
-      {/* Drop indicators rendered directly after the row, not after children */}
-      {sortable && dropPosition === 'after' && (
-        <div className="drop-indicator" style={{ marginLeft: `${8 + depth * 16}px` }} />
-      )}
       {sortable && dropPosition === 'inside' && (
         <div className="drop-indicator" style={{ marginLeft: `${8 + (depth + 1) * 16}px` }} />
       )}
@@ -312,6 +308,12 @@ function PageItem({
           isDescendant={isDescendant}
           sortable={sortable}
         />
+      )}
+
+      {/* Below the expanded children: dropping "after" places the page after
+          this row's entire subtree in sibling order, so show it there */}
+      {sortable && dropPosition === 'after' && (
+        <div className="drop-indicator" style={{ marginLeft: `${8 + depth * 16}px` }} />
       )}
     </div>
   );

@@ -387,10 +387,12 @@ export default function Editor({
     [onDirtyChange]
   );
 
-  // Register dirty check function for parent
+  // Register dirty check function for parent. Unregister on unmount, or a
+  // deleted-while-dirty page keeps answering "dirty" for the next navigation.
   useEffect(() => {
     if (onRegisterDirtyCheck) {
       onRegisterDirtyCheck(() => isDirtyRef.current);
+      return () => onRegisterDirtyCheck(() => false);
     }
   }, [onRegisterDirtyCheck]);
 
@@ -473,8 +475,10 @@ export default function Editor({
                   top: event.clientY,
                 });
                 const node = schema.nodes.image.create({ src: url });
-                const transaction = view.state.tr.insert(coordinates?.pos ?? 0, node);
-                view.dispatch(transaction);
+                // Fall back to the cursor: position 0 sits before the first
+                // block, where an inline node is a schema violation
+                const pos = coordinates?.pos ?? view.state.selection.from;
+                view.dispatch(view.state.tr.insert(pos, node));
               } catch (err) {
                 console.error('Image upload failed:', err);
               }

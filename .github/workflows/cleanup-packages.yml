@@ -14,6 +14,12 @@ jobs:
       packages: write
 
     steps:
+      # This action is not manifest-aware: it deletes ANY untagged version,
+      # including child manifests still referenced by a tagged OCI index.
+      # That is only safe because docker.yml builds with provenance/SBOM
+      # disabled, so tags are single manifests with no untagged children.
+      # Do not re-enable provenance without replacing this cleanup with a
+      # manifest-aware one.
       - name: Delete untagged versions
         uses: actions/delete-package-versions@v5
         with:

@@ -1,10 +1,17 @@
 name: Update lockfiles
 
 # Regenerates backend/ and frontend/ package-lock.json from package.json and
-# commits them to the branch the workflow runs on. Run it manually after
-# changing dependencies in a package.json (there is no local Node setup):
-#   gh workflow run lockfiles.yml --ref <branch>
+# commits them to the branch the workflow runs on. Runs automatically when a
+# package.json changes on main (there is no local Node setup), or manually
+# from the Actions tab.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - backend/package.json
+      - frontend/package.json
+      - .github/workflows/lockfiles.yml
   workflow_dispatch:
 
 jobs:

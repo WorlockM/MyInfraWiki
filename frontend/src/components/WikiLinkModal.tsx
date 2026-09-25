@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { Search, X, FileText } from 'lucide-react';
+import { showError } from '../toast';
 
 interface PageItem {
   id: string;
@@ -31,7 +32,7 @@ export default function WikiLinkModal({ onClose, onSelect }: WikiLinkModalProps)
         setAllPages(res.data);
         setResults(res.data);
       })
-      .catch((err) => console.error('Failed to fetch pages:', err))
+      .catch((err) => showError('Could not load pages', err))
       .finally(() => setLoading(false));
   }, []);
 

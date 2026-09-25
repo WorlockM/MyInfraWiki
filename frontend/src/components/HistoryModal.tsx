@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import DOMPurify from 'dompurify';
+import { showError } from '../toast';
 import { X, Clock, RotateCcw } from 'lucide-react';
 
 interface Version {
@@ -129,7 +130,7 @@ export default function HistoryModal({ pageId, currentContent, onClose, onRestor
     axios
       .get<Version[]>(`/api/pages/${pageId}/versions`)
       .then((res) => setVersions(res.data))
-      .catch((err) => console.error('Failed to load versions:', err))
+      .catch((err) => showError('Could not load page history', err))
       .finally(() => setLoading(false));
   }, [pageId]);
 
@@ -149,7 +150,7 @@ export default function HistoryModal({ pageId, currentContent, onClose, onRestor
         setSelected(res.data);
         setView('preview');
       } catch (err) {
-        console.error('Failed to load version:', err);
+        showError('Could not load version', err);
       }
     },
     [pageId]
@@ -164,7 +165,7 @@ export default function HistoryModal({ pageId, currentContent, onClose, onRestor
       onRestored();
       onClose();
     } catch (err) {
-      console.error('Failed to restore:', err);
+      showError('Could not restore version', err);
       setRestoring(false);
     }
   }, [selected, pageId, onRestored, onClose]);

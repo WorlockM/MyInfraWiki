@@ -24,6 +24,7 @@ import { PageTreeExtension } from './PageTreeExtension';
 import WikiLinkModal from './WikiLinkModal';
 import HistoryModal from './HistoryModal';
 import axios from 'axios';
+import { showError } from '../toast';
 import {
   Bold,
   Italic,
@@ -480,7 +481,7 @@ export default function Editor({
                 const pos = coordinates?.pos ?? view.state.selection.from;
                 view.dispatch(view.state.tr.insert(pos, node));
               } catch (err) {
-                console.error('Image upload failed:', err);
+                showError('Image upload failed', err);
               }
             });
             return true;
@@ -504,7 +505,7 @@ export default function Editor({
               const node = schema.nodes.image.create({ src: url });
               view.dispatch(view.state.tr.replaceSelectionWith(node));
             } catch (err) {
-              console.error('Image paste upload failed:', err);
+              showError('Image upload failed', err);
             }
           });
           return true;
@@ -551,7 +552,7 @@ export default function Editor({
       })
       .catch((err) => {
         if (!cancelled) {
-          console.error('Failed to load page:', err);
+          showError('Could not load page', err);
           setLoading(false);
         }
       });
@@ -604,7 +605,7 @@ export default function Editor({
         setConflictDetected(true);
         return 'conflict';
       }
-      console.error('Failed to save page:', err);
+      showError('Could not save page', err);
       setSaveStatus('error');
       return 'error';
     }
@@ -678,12 +679,7 @@ export default function Editor({
         })
         .run();
     } catch (err) {
-      console.error('Attachment upload failed:', err);
-      const message =
-        axios.isAxiosError(err) && err.response?.data?.error
-          ? err.response.data.error
-          : 'Attachment upload failed';
-      window.alert(message);
+      showError('Attachment upload failed', err);
     }
   };
 
@@ -770,8 +766,7 @@ export default function Editor({
         .from(wrapper)
         .save();
     } catch (err) {
-      console.error('PDF export failed:', err);
-      window.alert('PDF export failed. See the browser console for details.');
+      showError('PDF export failed', err);
     } finally {
       // Always restore the theme and unblock the UI, even when export fails
       wrapper.remove();
@@ -930,7 +925,10 @@ export default function Editor({
                 setDirty(false);
                 setIsEditing(false);
                 setLoading(false);
-              }).catch(() => setLoading(false));
+              }).catch((err) => {
+                showError('Could not reload page', err);
+                setLoading(false);
+              });
             }}
           >
             Discard &amp; reload
@@ -989,7 +987,7 @@ export default function Editor({
               editor?.commands.setContent(res.data.content || '');
               setWordCount(editor?.storage.characterCount?.words() ?? 0);
               setDirty(false);
-            });
+            }).catch((err) => showError('Could not reload page', err));
           }}
         />
       )}

@@ -1,8 +1,8 @@
 # Stage 1: Build frontend
-FROM node:20-alpine AS frontend-build
+FROM node:24-alpine AS frontend-build
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 COPY frontend/ ./
 ARG APP_VERSION=dev
 ARG APP_COMMIT=unknown
@@ -11,17 +11,17 @@ ENV VITE_APP_COMMIT=$APP_COMMIT
 RUN npm run build
 
 # Stage 2: Build backend
-FROM node:20-alpine AS backend-build
+FROM node:24-alpine AS backend-build
 WORKDIR /app/backend
 # Build tools needed for better-sqlite3 native compilation
 RUN apk add --no-cache python3 make g++
-COPY backend/package*.json ./
-RUN npm install
+COPY backend/package.json backend/package-lock.json ./
+RUN npm ci
 COPY backend/ ./
 RUN npm run build
 
 # Stage 3: Production
-FROM node:20-alpine
+FROM node:24-alpine
 WORKDIR /app
 
 # su-exec lets the entrypoint drop from root to the node user after fixing
@@ -29,10 +29,11 @@ WORKDIR /app
 RUN apk add --no-cache su-exec
 
 # Install build tools, install production deps, then remove tools — all in one
-# layer so intermediate files don't bloat the final image
-COPY backend/package*.json ./
+# layer so intermediate files don't bloat the final image. `npm ci` installs
+# exactly the versions in the lockfile, so every build of a commit is the same.
+COPY backend/package.json backend/package-lock.json ./
 RUN apk add --no-cache python3 make g++ \
-  && npm install --omit=dev \
+  && npm ci --omit=dev \
   && apk del python3 make g++
 
 # Copy backend build output

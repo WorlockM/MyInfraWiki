@@ -115,6 +115,19 @@ db.exec(`
   );
 `);
 
+// Migration: soft delete. A deleted page keeps its row (and thereby its
+// version history and uploads) in the trash until it is purged. All pages
+// deleted in one action share the same deleted_at, which identifies the batch
+// that is restored or purged together.
+{
+  const columns = db.prepare('PRAGMA table_info(pages)').all() as { name: string }[];
+  if (!columns.some((c) => c.name === 'deleted_at')) {
+    db.exec('ALTER TABLE pages ADD COLUMN deleted_at TEXT');
+  }
+}
+
+const TRASH_RETENTION_DAYS = 30;
+
 // Seed demo content if the database is empty
 {
   const count = (db.prepare('SELECT COUNT(*) as c FROM pages').get() as { c: number }).c;
@@ -167,7 +180,7 @@ for page in pages:
 // Rebuild the FTS index from the pages table on every startup
 {
   const ftsInsert = db.prepare('INSERT INTO pages_fts(page_id, title, body) VALUES (?, ?, ?)');
-  const allPages = db.prepare('SELECT id, title, content FROM pages').all() as { id: string; title: string; content: string }[];
+  const allPages = db.prepare('SELECT id, title, content FROM pages WHERE deleted_at IS NULL').all() as { id: string; title: string; content: string }[];
   db.transaction(() => {
     db.exec('DELETE FROM pages_fts');
     for (const p of allPages) {
@@ -184,7 +197,23 @@ if (NODE_ENV !== 'production') {
   app.use(cors());
 }
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+
+// Reject state-changing API requests that the browser marks as coming from
+// another site. The app has no authentication of its own, so without this any
+// web page could make the browser submit a form to the wiki (creating pages,
+// restoring versions, uploading files) — and behind a cookie-based auth proxy
+// the browser would even attach the login session. Sec-Fetch-Site is sent by
+// all current browsers; requests without it (curl, scripts) are not
+// browser-initiated and are allowed.
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  if (SAFE_METHODS.has(req.method)) return next();
+  const site = req.get('Sec-Fetch-Site');
+  if (site && site !== 'same-origin' && site !== 'none') {
+    return res.status(403).json({ error: 'Cross-site requests are not allowed' });
+  }
+  next();
+});
 
 // Serve uploaded files. nosniff + attachment keep uploads inert: a crafted
 // SVG or HTML file downloads instead of executing scripts same-origin.
@@ -291,16 +320,46 @@ function ftsDelete(pageId: string) {
   db.prepare('DELETE FROM pages_fts WHERE page_id = ?').run(pageId);
 }
 
-// Helper: get all descendant IDs for a page
-function getDescendantIds(pageId: string): string[] {
-  const children = db.prepare('SELECT id FROM pages WHERE parent_id = ?').all(pageId) as { id: string }[];
-  const ids: string[] = [];
-  for (const child of children) {
-    ids.push(child.id);
-    ids.push(...getDescendantIds(child.id));
-  }
-  return ids;
+// Helper: ids of a page and its descendants that share its deleted_at: the
+// live subtree for an active page (deletedAt null), the deletion batch for a
+// page in the trash. `IS` compares both NULL and string values.
+function getSubtreeIds(pageId: string, deletedAt: string | null): string[] {
+  const rows = db
+    .prepare(
+      `WITH RECURSIVE subtree(id) AS (
+         SELECT id FROM pages WHERE id = ?
+         UNION ALL
+         SELECT p.id FROM pages p JOIN subtree s ON p.parent_id = s.id WHERE p.deleted_at IS ?
+       )
+       SELECT id FROM subtree`
+    )
+    .all(pageId, deletedAt) as { id: string }[];
+  return rows.map((r) => r.id);
 }
+
+function isActivePage(pageId: string): boolean {
+  return !!db.prepare('SELECT 1 FROM pages WHERE id = ? AND deleted_at IS NULL').get(pageId);
+}
+
+function nextSiblingPosition(parentId: string | null): number {
+  const row = db
+    .prepare('SELECT COALESCE(MAX(position), -1) AS max_pos FROM pages WHERE parent_id IS ? AND deleted_at IS NULL')
+    .get(parentId) as { max_pos: number };
+  return row.max_pos + 1;
+}
+
+// Permanently delete trashed pages older than the retention period
+function purgeExpiredTrash() {
+  try {
+    const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const result = db.prepare('DELETE FROM pages WHERE deleted_at IS NOT NULL AND deleted_at < ?').run(cutoff);
+    if (result.changes > 0) setImmediate(cleanupOrphanedUploads);
+  } catch (err) {
+    console.error('Error purging trash:', err);
+  }
+}
+purgeExpiredTrash();
+setInterval(purgeExpiredTrash, 60 * 60 * 1000).unref();
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
 
@@ -309,7 +368,7 @@ app.get('/api/pages', (_req: Request, res: Response) => {
   try {
     const pages = db
       .prepare(
-        'SELECT id, title, parent_id, position, created_at, updated_at FROM pages ORDER BY position ASC, created_at ASC'
+        'SELECT id, title, parent_id, position, created_at, updated_at FROM pages WHERE deleted_at IS NULL ORDER BY position ASC, created_at ASC'
       )
       .all();
     res.json(pages);
@@ -322,7 +381,7 @@ app.get('/api/pages', (_req: Request, res: Response) => {
 // GET /api/pages/:id - returns single page with content
 app.get('/api/pages/:id', (req: Request, res: Response) => {
   try {
-    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
+    const page = db.prepare('SELECT * FROM pages WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
     if (!page) {
       return res.status(404).json({ error: 'Page not found' });
     }
@@ -340,13 +399,10 @@ app.post('/api/pages', (req: Request, res: Response) => {
     const id = uuidv4();
     const now = new Date().toISOString();
 
-    // Get max position for siblings
-    const maxPositionRow = db
-      .prepare(
-        'SELECT COALESCE(MAX(position), -1) as max_pos FROM pages WHERE parent_id IS ?'
-      )
-      .get(parent_id) as { max_pos: number };
-    const position = maxPositionRow.max_pos + 1;
+    if (parent_id !== null && !isActivePage(parent_id)) {
+      return res.status(400).json({ error: 'Parent page not found' });
+    }
+    const position = nextSiblingPosition(parent_id);
 
     db.prepare(
       'INSERT INTO pages (id, title, content, parent_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
@@ -372,7 +428,7 @@ app.put('/api/pages/reorder', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'ordered_ids must be an array of page ids' });
     }
 
-    const stmt = db.prepare('UPDATE pages SET position = ? WHERE id = ?');
+    const stmt = db.prepare('UPDATE pages SET position = ? WHERE id = ? AND deleted_at IS NULL');
     db.transaction(() => {
       (ordered_ids as string[]).forEach((id, index) => stmt.run(index, id));
     })();
@@ -390,7 +446,7 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
     const { title, content, parent_id, position } = req.body;
     const now = new Date().toISOString();
 
-    const existing = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id) as {
+    const existing = db.prepare('SELECT * FROM pages WHERE id = ? AND deleted_at IS NULL').get(req.params.id) as {
       id: string;
       title: string;
       content: string;
@@ -414,10 +470,13 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
     const newParentId = parent_id !== undefined ? parent_id : existing.parent_id;
     const newPosition = position !== undefined ? position : existing.position;
 
-    // Guard: prevent circular reference (moving a page under its own descendant)
+    // Guard: the new parent must exist, and a page cannot be moved under
+    // itself or one of its own descendants
     if (newParentId && newParentId !== existing.parent_id) {
-      const descendants = getDescendantIds(req.params.id);
-      if (newParentId === req.params.id || descendants.includes(newParentId)) {
+      if (!isActivePage(newParentId)) {
+        return res.status(400).json({ error: 'Parent page not found' });
+      }
+      if (getSubtreeIds(req.params.id, null).includes(newParentId)) {
         return res.status(400).json({ error: 'Cannot move a page under its own descendant' });
       }
     }
@@ -452,28 +511,24 @@ app.put('/api/pages/:id', (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/pages/:id - delete page and all descendants
+// DELETE /api/pages/:id - move a page and all its descendants to the trash
 app.delete('/api/pages/:id', (req: Request, res: Response) => {
   try {
-    const page = db.prepare('SELECT id FROM pages WHERE id = ?').get(req.params.id);
-    if (!page) {
+    if (!isActivePage(req.params.id)) {
       return res.status(404).json({ error: 'Page not found' });
     }
 
-    const descendantIds = getDescendantIds(req.params.id);
-    const allIds = [req.params.id, ...descendantIds];
-
-    const deleteStmt = db.prepare('DELETE FROM pages WHERE id = ?');
-    const deleteMany = db.transaction((ids: string[]) => {
+    const ids = getSubtreeIds(req.params.id, null);
+    const now = new Date().toISOString();
+    const markStmt = db.prepare('UPDATE pages SET deleted_at = ? WHERE id = ?');
+    db.transaction(() => {
       for (const id of ids) {
-        deleteStmt.run(id);
+        markStmt.run(now, id);
+        ftsDelete(id);
       }
-    });
-    deleteMany(allIds);
-    for (const id of allIds) ftsDelete(id);
-    setImmediate(cleanupOrphanedUploads);
+    })();
 
-    res.json({ success: true, deleted: allIds.length });
+    res.json({ success: true, deleted: ids.length });
   } catch (err) {
     console.error('Error deleting page:', err);
     res.status(500).json({ error: 'Failed to delete page' });
@@ -483,8 +538,7 @@ app.delete('/api/pages/:id', (req: Request, res: Response) => {
 // GET /api/pages/:id/versions - list all versions for a page
 app.get('/api/pages/:id/versions', (req: Request, res: Response) => {
   try {
-    const page = db.prepare('SELECT id FROM pages WHERE id = ?').get(req.params.id);
-    if (!page) return res.status(404).json({ error: 'Page not found' });
+    if (!isActivePage(req.params.id)) return res.status(404).json({ error: 'Page not found' });
 
     const versions = db
       .prepare('SELECT id, title, saved_at, version_number FROM page_versions WHERE page_id = ? ORDER BY version_number DESC')
@@ -513,7 +567,7 @@ app.get('/api/pages/:id/versions/:versionId', (req: Request, res: Response) => {
 // POST /api/pages/:id/restore/:versionId - restore a page to a previous version
 app.post('/api/pages/:id/restore/:versionId', (req: Request, res: Response) => {
   try {
-    const existing = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id) as {
+    const existing = db.prepare('SELECT * FROM pages WHERE id = ? AND deleted_at IS NULL').get(req.params.id) as {
       id: string; title: string; content: string;
     } | undefined;
     if (!existing) return res.status(404).json({ error: 'Page not found' });
@@ -543,14 +597,13 @@ app.post('/api/pages/:id/restore/:versionId', (req: Request, res: Response) => {
 // GET /api/pages/:id/backlinks - pages that link to this page
 app.get('/api/pages/:id/backlinks', (req: Request, res: Response) => {
   try {
-    const page = db.prepare('SELECT id FROM pages WHERE id = ?').get(req.params.id);
-    if (!page) return res.status(404).json({ error: 'Page not found' });
+    if (!isActivePage(req.params.id)) return res.status(404).json({ error: 'Page not found' });
 
     // Escape LIKE wildcards; the id comes from the URL and is not guaranteed
     // to be a well-formed uuid
     const idEscaped = req.params.id.replace(/[\\%_]/g, (c) => `\\${c}`);
     const backlinks = db
-      .prepare(`SELECT id, title FROM pages WHERE content LIKE ? ESCAPE '\\' AND id != ?`)
+      .prepare(`SELECT id, title FROM pages WHERE content LIKE ? ESCAPE '\\' AND id != ? AND deleted_at IS NULL`)
       .all(`%data-page-id="${idEscaped}"%`, req.params.id);
     res.json(backlinks);
   } catch (err) {
@@ -616,6 +669,111 @@ app.post('/api/upload-attachment', uploadAttachment.single('file'), (req: Reques
   }
 });
 
+// ─── Trash ────────────────────────────────────────────────────────────────────
+
+interface TrashedPage {
+  id: string;
+  title: string;
+  content: string;
+  parent_id: string | null;
+  deleted_at: string;
+}
+
+function getTrashedPage(pageId: string): TrashedPage | undefined {
+  return db
+    .prepare('SELECT id, title, content, parent_id, deleted_at FROM pages WHERE id = ? AND deleted_at IS NOT NULL')
+    .get(pageId) as TrashedPage | undefined;
+}
+
+// GET /api/trash - deleted pages, one entry per delete action (sub-pages that
+// were deleted along with their parent are counted, not listed)
+app.get('/api/trash', (_req: Request, res: Response) => {
+  try {
+    const rows = db
+      .prepare(
+        `SELECT p.id, p.title, p.deleted_at FROM pages p
+         LEFT JOIN pages parent ON parent.id = p.parent_id
+         WHERE p.deleted_at IS NOT NULL
+           AND (parent.id IS NULL OR parent.deleted_at IS NOT p.deleted_at)
+         ORDER BY p.deleted_at DESC`
+      )
+      .all() as { id: string; title: string; deleted_at: string }[];
+    res.json({
+      retention_days: TRASH_RETENTION_DAYS,
+      items: rows.map((r) => ({ ...r, subpage_count: getSubtreeIds(r.id, r.deleted_at).length - 1 })),
+    });
+  } catch (err) {
+    console.error('Error fetching trash:', err);
+    res.status(500).json({ error: 'Failed to fetch trash' });
+  }
+});
+
+// POST /api/trash/:id/restore - restore a deleted page with the sub-pages
+// that were deleted along with it. If its parent is gone or still in the
+// trash, the page is restored at the top level.
+app.post('/api/trash/:id/restore', (req: Request, res: Response) => {
+  try {
+    const page = getTrashedPage(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found in trash' });
+
+    const ids = getSubtreeIds(page.id, page.deleted_at);
+    const parentId = page.parent_id && isActivePage(page.parent_id) ? page.parent_id : null;
+    const restoreStmt = db.prepare('UPDATE pages SET deleted_at = NULL WHERE id = ?');
+    const getStmt = db.prepare('SELECT title, content FROM pages WHERE id = ?');
+
+    db.transaction(() => {
+      db.prepare('UPDATE pages SET parent_id = ?, position = ? WHERE id = ?').run(
+        parentId,
+        nextSiblingPosition(parentId),
+        page.id
+      );
+      for (const id of ids) {
+        restoreStmt.run(id);
+        const p = getStmt.get(id) as { title: string; content: string };
+        ftsUpdate(id, p.title, p.content);
+      }
+    })();
+
+    res.json({ success: true, id: page.id, restored: ids.length });
+  } catch (err) {
+    console.error('Error restoring page from trash:', err);
+    res.status(500).json({ error: 'Failed to restore page' });
+  }
+});
+
+// DELETE /api/trash/:id - permanently delete a trashed page and the sub-pages
+// that were deleted along with it
+app.delete('/api/trash/:id', (req: Request, res: Response) => {
+  try {
+    const page = getTrashedPage(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found in trash' });
+
+    const ids = getSubtreeIds(page.id, page.deleted_at);
+    const deleteStmt = db.prepare('DELETE FROM pages WHERE id = ?');
+    db.transaction(() => {
+      for (const id of ids) deleteStmt.run(id);
+    })();
+    setImmediate(cleanupOrphanedUploads);
+
+    res.json({ success: true, deleted: ids.length });
+  } catch (err) {
+    console.error('Error deleting page from trash:', err);
+    res.status(500).json({ error: 'Failed to delete page' });
+  }
+});
+
+// DELETE /api/trash - empty the trash
+app.delete('/api/trash', (_req: Request, res: Response) => {
+  try {
+    const result = db.prepare('DELETE FROM pages WHERE deleted_at IS NOT NULL').run();
+    setImmediate(cleanupOrphanedUploads);
+    res.json({ success: true, deleted: result.changes });
+  } catch (err) {
+    console.error('Error emptying trash:', err);
+    res.status(500).json({ error: 'Failed to empty trash' });
+  }
+});
+
 // GET /api/health - liveness check for Docker healthchecks and monitoring
 app.get('/api/health', (_req: Request, res: Response) => {
   try {
@@ -643,7 +801,7 @@ function safeFilename(title: string): string {
 app.get('/api/export', (_req: Request, res: Response) => {
   try {
     const pages = db
-      .prepare('SELECT id, title, content, parent_id FROM pages ORDER BY position ASC, created_at ASC')
+      .prepare('SELECT id, title, content, parent_id FROM pages WHERE deleted_at IS NULL ORDER BY position ASC, created_at ASC')
       .all() as { id: string; title: string; content: string; parent_id: string | null }[];
 
     // Group pages by parent; pages with a missing parent become root pages

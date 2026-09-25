@@ -216,7 +216,8 @@ function PageItem({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm(`Delete "${node.title}" and all its sub-pages?`)) {
+    const subpages = hasChildren ? ' and all its sub-pages' : '';
+    if (window.confirm(`Move "${node.title || 'Untitled'}"${subpages} to the trash?`)) {
       onDeletePage(node.id);
     }
   };
@@ -281,8 +282,8 @@ function PageItem({
             <button
               className="page-row__action-btn page-row__action-btn--danger"
               onClick={handleDelete}
-              title="Delete page"
-              aria-label="Delete page"
+              title="Move to trash"
+              aria-label="Move to trash"
             >
               <Trash2 size={13} />
             </button>

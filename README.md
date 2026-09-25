@@ -26,6 +26,7 @@
 - **Full-text search** – fast SQLite FTS5 search across all page titles and content
 - **Page history** – every save creates a version snapshot; restore any previous version with a word-level diff view
 - **Backlinks** – see which pages link to the current page
+- **Trash** – deleted pages (with their sub-pages) go to the trash first, with an Undo right after deleting; restore them from the trash button in the sidebar, or they are permanently deleted after 30 days
 - **Mermaid diagrams** – render flowcharts, sequence diagrams, pie charts and more inside code blocks
 
 ## Screenshots
@@ -95,6 +96,8 @@ MyInfraWiki has **no built-in authentication** — anyone who can reach the port
 - a reverse proxy with authentication (e.g. Nginx with basic auth, Caddy, Authelia, or an OAuth proxy),
 - a VPN or overlay network such as WireGuard or Tailscale,
 - or at minimum a firewall rule restricting access to trusted hosts.
+
+State-changing API requests that the browser marks as cross-site (`Sec-Fetch-Site`) are rejected, so another website cannot make your browser modify the wiki — also relevant when an auth proxy keeps you logged in with a cookie. Scripts and `curl` (which send no such header) are unaffected.
 
 Uploaded files are served with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so they download instead of executing in the browser. The app itself runs as the unprivileged `node` user: the entrypoint starts as root only to make `/data` writable for that user (including volumes created by older versions), then drops privileges. A liveness endpoint is available at `GET /api/health`.
 
@@ -172,7 +175,7 @@ docker compose restart myinfrawiki
 | Layer     | Technology                         |
 |-----------|------------------------------------|
 | Frontend  | React, TypeScript, TipTap v2       |
-| Backend   | Node.js, Express, TypeScript       |
+| Backend   | Node.js 24, Express, TypeScript    |
 | Database  | SQLite (via `better-sqlite3`)      |
 | Bundler   | Vite                               |
 | Container | Docker (multi-stage build)         |

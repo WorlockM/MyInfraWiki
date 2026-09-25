@@ -1,0 +1,45 @@
+name: Update lockfiles
+
+# Regenerates backend/ and frontend/ package-lock.json from package.json and
+# commits them to the branch the workflow runs on. Run it manually after
+# changing dependencies in a package.json (there is no local Node setup):
+#   gh workflow run lockfiles.yml --ref <branch>
+on:
+  workflow_dispatch:
+
+jobs:
+  update:
+    name: Regenerate package-lock.json
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Same major Node/npm version as the Docker image, so `npm ci` in the
+      # image accepts the lockfiles
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Regenerate lockfiles
+        run: |
+          for dir in backend frontend; do
+            (cd "$dir" && rm -f package-lock.json && npm install --package-lock-only --ignore-scripts --no-audit --no-fund)
+          done
+
+      - name: Commit lockfiles
+        run: |
+          git add backend/package-lock.json frontend/package-lock.json
+          if git diff --cached --quiet; then
+            echo "Lockfiles are up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898799+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update package-lock.json files"
+          git push

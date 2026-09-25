@@ -3,7 +3,10 @@ import axios from 'axios';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
 import SearchModal from './components/SearchModal';
-import { Moon, Sun, Search, Menu, Download, FileText } from 'lucide-react';
+import TrashModal from './components/TrashModal';
+import Toaster from './components/Toaster';
+import { showError, showToast } from './toast';
+import { Moon, Sun, Search, Menu, Download, FileText, Trash2 } from 'lucide-react';
 
 export interface PageTreeNode {
   id: string;
@@ -68,6 +71,7 @@ export default function App() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   const [searchOpen, setSearchOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -115,7 +119,7 @@ export default function App() {
         history.replaceState(null, '', window.location.pathname + window.location.search);
       }
     } catch (err) {
-      console.error('Failed to fetch pages:', err);
+      showError('Could not load pages', err);
     } finally {
       setLoading(false);
     }
@@ -158,7 +162,7 @@ export default function App() {
       // A wiki-link can point at a page that has since been deleted
       const ids = existingPageIdsRef.current;
       if (ids.length > 0 && !ids.includes(id)) {
-        window.alert('This page no longer exists. It may have been deleted.');
+        showToast('error', 'This page no longer exists. It may have been deleted.');
         return;
       }
       if (!confirmIfDirty()) return;
@@ -183,20 +187,41 @@ export default function App() {
       setSelectedPageId(res.data.id);
       window.location.hash = `/page/${res.data.id}`;
     } catch (err) {
-      console.error('Failed to create page:', err);
+      showError('Could not create page', err);
     }
   };
 
+  // Opens a page via the URL hash; the hashchange handler takes care of the
+  // unsaved-changes check and the selection
+  const openPageViaHash = (id: string) => {
+    window.location.hash = `/page/${id}`;
+  };
+
+  const handleRestoreFromTrash = async (id: string) => {
+    await fetchPages();
+    openPageViaHash(id);
+  };
+
   const handleDeletePage = async (id: string) => {
+    const title = flatPages.find((p) => p.id === id)?.title || 'Untitled';
     try {
       await axios.delete(`/api/pages/${id}`);
-      if (selectedPageId === id) {
-        setSelectedPageId(null);
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-      }
+      // The deleted page may be the open one, or an ancestor of it:
+      // fetchPages drops a selection that no longer exists
       await fetchPages();
+      showToast('success', `Moved "${title}" to the trash`, {
+        label: 'Undo',
+        onClick: async () => {
+          try {
+            await axios.post(`/api/trash/${id}/restore`);
+            await handleRestoreFromTrash(id);
+          } catch (err) {
+            showError('Could not restore the page', err);
+          }
+        },
+      });
     } catch (err) {
-      console.error('Failed to delete page:', err);
+      showError('Could not delete page', err);
     }
   };
 
@@ -205,7 +230,7 @@ export default function App() {
       await axios.put(`/api/pages/${pageId}`, { parent_id: newParentId });
       await fetchPages();
     } catch (err) {
-      console.error('Failed to reparent page:', err);
+      showError('Could not move page', err);
     }
   }, [fetchPages]);
 
@@ -214,7 +239,7 @@ export default function App() {
       await axios.put('/api/pages/reorder', { ordered_ids: orderedIds });
       await fetchPages();
     } catch (err) {
-      console.error('Failed to reorder pages:', err);
+      showError('Could not reorder pages', err);
     }
   }, [fetchPages]);
 
@@ -253,6 +278,14 @@ export default function App() {
               aria-label="Export wiki"
             >
               <Download size={16} />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => setTrashOpen(true)}
+              title="Trash"
+              aria-label="Open trash"
+            >
+              <Trash2 size={16} />
             </button>
             <button
               className="icon-btn"
@@ -357,6 +390,18 @@ export default function App() {
           }}
         />
       )}
+
+      {trashOpen && (
+        <TrashModal
+          onClose={() => setTrashOpen(false)}
+          onRestored={(id) => {
+            setTrashOpen(false);
+            handleRestoreFromTrash(id);
+          }}
+        />
+      )}
+
+      <Toaster />
     </div>
   );
 }
